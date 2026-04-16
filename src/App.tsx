@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   LayoutDashboard, 
   Database, 
@@ -17,7 +17,13 @@ import {
   BarChart3,
   Building2,
   FolderTree,
-  Target
+  Target,
+  FileText,
+  Edit2,
+  Trash2,
+  Save,
+  ChevronDown,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -35,19 +41,55 @@ import {
 } from './mockData';
 import { OPD, Program, Activity, SubActivity, Tag, BudgetTag } from './types';
 
-type View = 'dashboard' | 'opd' | 'program' | 'tag' | 'tagging';
+type View = 'dashboard' | 'opd' | 'program' | 'tag' | 'tagging' | 'laporan';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   
-  // App State (In a real app, this would be from a context or database)
-  const [opds] = useState<OPD[]>(INITIAL_OPDS);
-  const [programs] = useState<Program[]>(INITIAL_PROGRAMS);
-  const [activities] = useState<Activity[]>(INITIAL_ACTIVITIES);
-  const [subActivities] = useState<SubActivity[]>(INITIAL_SUB_ACTIVITIES);
-  const [tags] = useState<Tag[]>(INITIAL_TAGS);
+  // App State
+  const [opds, setOpds] = useState<OPD[]>(INITIAL_OPDS);
+  const [programs, setPrograms] = useState<Program[]>(INITIAL_PROGRAMS);
+  const [activities, setActivities] = useState<Activity[]>(INITIAL_ACTIVITIES);
+  const [subActivities, setSubActivities] = useState<SubActivity[]>(INITIAL_SUB_ACTIVITIES);
+  const [tags, setTags] = useState<Tag[]>(INITIAL_TAGS);
   const [budgetTags, setBudgetTags] = useState<BudgetTag[]>(INITIAL_BUDGET_TAGS);
+
+  // CRUD Handlers
+  const addOPD = (o: Omit<OPD, 'id'>) => {
+    setOpds([...opds, { ...o, id: `opd-${Date.now()}` }]);
+  };
+  const updateOPD = (updated: OPD) => {
+    setOpds(opds.map(o => o.id === updated.id ? updated : o));
+  };
+  const deleteOPD = (id: string) => {
+    setOpds(opds.filter(o => o.id !== id));
+  };
+
+  const addTag = (t: Omit<Tag, 'id'>) => {
+    setTags([...tags, { ...t, id: `tag-${Date.now()}` }]);
+  };
+  const updateTag = (updated: Tag) => {
+    setTags(tags.map(t => t.id === updated.id ? updated : t));
+  };
+  const deleteTag = (id: string) => {
+    setTags(tags.filter(t => t.id !== id));
+    setBudgetTags(budgetTags.filter(bt => bt.tagId !== id));
+  };
+
+  const addProgram = (p: Omit<Program, 'id'>) => {
+    setPrograms([...programs, { ...p, id: `p-${Date.now()}` }]);
+  };
+  const addActivity = (a: Omit<Activity, 'id'>) => {
+    setActivities([...activities, { ...a, id: `a-${Date.now()}` }]);
+  };
+  const addSubActivity = (s: Omit<SubActivity, 'id'>) => {
+    setSubActivities([...subActivities, { ...s, id: `s-${Date.now()}` }]);
+  };
+  const deleteSubActivity = (id: string) => {
+    setSubActivities(subActivities.filter(s => s.id !== id));
+    setBudgetTags(budgetTags.filter(bt => bt.subActivityId !== id));
+  };
 
   const toggleTag = (subActivityId: string, tagId: string) => {
     setBudgetTags(prev => {
@@ -67,34 +109,35 @@ export default function App() {
       { id: 'tag', label: 'Master Tagging', icon: Target },
     ]},
     { id: 'tagging', label: 'Tagging Anggaran', icon: Tags },
+    { id: 'laporan', label: 'Laporan Tagging', icon: FileText },
   ];
 
   return (
-    <div className="flex h-screen bg-[#F0F2F5] font-sans text-[#1A1A1A] overflow-hidden">
+    <div className="flex h-screen bg-background font-sans text-text-main overflow-hidden">
       {/* Sidebar */}
       <aside 
-        className={`${isSidebarOpen ? 'w-72' : 'w-20'} bg-[#1E293B] text-white transition-all duration-300 ease-in-out flex flex-col z-20 shadow-xl`}
+        className={`${isSidebarOpen ? 'w-[260px]' : 'w-20'} bg-primary text-white transition-all duration-300 ease-in-out flex flex-col z-20 border-r border-white/10 shadow-xl`}
       >
-        <div className="p-6 flex items-center gap-3 border-b border-slate-700/50">
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center shrink-0">
-            <span className="font-bold text-lg italic text-white">N</span>
+        <div className="p-6 pb-8 flex items-center gap-3">
+          <div className="w-8 h-10 rounded-[4px] bg-[#FFD700] flex items-center justify-center shrink-0 shadow-sm">
+            <span className="font-bold text-[10px] text-primary text-center leading-tight uppercase">NTB</span>
           </div>
           {isSidebarOpen && (
             <div className="overflow-hidden whitespace-nowrap">
-              <h1 className="font-bold text-lg tracking-tight">E-TAGGING NTB</h1>
-              <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase italic">Provinsi NTB</p>
+              <h1 className="font-bold text-sm tracking-tight leading-none">SiTAG Anggaran</h1>
+              <p className="text-[10px] text-white/70 font-medium italic">Provinsi NTB</p>
             </div>
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-6 px-3 custom-scrollbar">
-          <ul className="space-y-2">
+        <nav className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+          <ul className="space-y-1">
             {navItems.map((item) => (
               <li key={item.id}>
                 {item.children ? (
-                  <div className="space-y-1">
+                  <div className="mt-4">
                     {isSidebarOpen && (
-                      <p className="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
+                      <p className="px-6 py-2 text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
                         {item.label}
                       </p>
                     )}
@@ -102,28 +145,30 @@ export default function App() {
                       <button
                         key={child.id}
                         onClick={() => setCurrentView(child.id as View)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                        className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
                           currentView === child.id 
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            ? 'bg-white/10 text-white' 
+                            : 'text-white/60 hover:bg-white/5 hover:text-white'
                         }`}
                       >
-                        <child.icon size={20} />
-                        {isSidebarOpen && <span className="font-medium text-sm">{child.label}</span>}
+                        {currentView === child.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
+                        <child.icon size={18} className={currentView === child.id ? 'text-accent' : ''} />
+                        {isSidebarOpen && <span className="font-medium text-[14px]">{child.label}</span>}
                       </button>
                     ))}
                   </div>
                 ) : (
                   <button
                     onClick={() => setCurrentView(item.id as View)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
                       currentView === item.id 
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-white/10 text-white' 
+                        : 'text-white/60 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    <item.icon size={20} />
-                    {isSidebarOpen && <span className="font-medium text-sm">{item.label}</span>}
+                    {currentView === item.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
+                    <item.icon size={18} className={currentView === item.id ? 'text-accent' : ''} />
+                    {isSidebarOpen && <span className="font-medium text-[14px]">{item.label}</span>}
                   </button>
                 )}
               </li>
@@ -131,12 +176,12 @@ export default function App() {
           </ul>
         </nav>
 
-        <div className="p-4 border-t border-slate-700/50">
+        <div className="p-4 border-t border-white/10">
           <button 
             onClick={() => setSidebarOpen(!isSidebarOpen)}
-            className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-slate-800 transition-colors text-slate-400"
+            className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-white/5 transition-colors text-white/50"
           >
-            {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            {isSidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </aside>
@@ -144,33 +189,30 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-20 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-10 shrink-0">
+        <header className="h-[72px] bg-surface border-b border-border px-8 flex items-center justify-between sticky top-0 z-10 shrink-0">
           <div>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {currentView === 'dashboard' && 'Beranda Dashboard'}
+            <h2 className="text-[18px] font-semibold text-text-main tracking-tight">
+              {currentView === 'dashboard' && 'Dashboard Ringkasan'}
               {currentView === 'opd' && 'Master Data OPD'}
               {currentView === 'program' && 'Program & Kegiatan'}
               {currentView === 'tag' && 'Master Tagging'}
               {currentView === 'tagging' && 'Tagging Anggaran'}
             </h2>
-            <p className="text-xs text-slate-500 font-medium italic">
-              Sistem Informasi Pelabelan Anggaran Tematik Daerah
-            </p>
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="bg-slate-100 p-2 px-3 rounded-full flex items-center gap-2 text-xs font-semibold text-slate-600 hidden md:flex">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              TA 2024
+            <div className="text-right hidden md:block">
+              <p className="text-sm font-semibold text-text-main leading-none">Admin BKAD</p>
+              <p className="text-[12px] text-text-muted">Provinsi NTB</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center font-bold text-slate-500">
-              U
+            <div className="w-9 h-9 rounded-full bg-border flex items-center justify-center font-bold text-text-muted text-sm shadow-sm ring-2 ring-background">
+              AD
             </div>
           </div>
         </header>
 
         {/* View Container */}
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-background">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentView}
@@ -186,9 +228,34 @@ export default function App() {
                   budgetTags={budgetTags} 
                 />
               )}
-              {currentView === 'opd' && <MasterOPDView opds={opds} />}
-              {currentView === 'program' && <MasterProgramView opds={opds} programs={programs} activities={activities} subActivities={subActivities} />}
-              {currentView === 'tag' && <MasterTagView tags={tags} />}
+              {currentView === 'opd' && (
+                <MasterOPDView 
+                  opds={opds} 
+                  onAdd={addOPD}
+                  onUpdate={updateOPD}
+                  onDelete={deleteOPD}
+                />
+              )}
+              {currentView === 'program' && (
+                <MasterProgramView 
+                  opds={opds} 
+                  programs={programs} 
+                  activities={activities} 
+                  subActivities={subActivities} 
+                  onAddProgram={addProgram}
+                  onAddActivity={addActivity}
+                  onAddSubActivity={addSubActivity}
+                  onDeleteSubActivity={deleteSubActivity}
+                />
+              )}
+              {currentView === 'tag' && (
+                <MasterTagView 
+                  tags={tags} 
+                  onAdd={addTag}
+                  onUpdate={updateTag}
+                  onDelete={deleteTag}
+                />
+              )}
               {currentView === 'tagging' && (
                 <TaggingView 
                   subActivities={subActivities} 
@@ -197,10 +264,43 @@ export default function App() {
                   onToggleTag={toggleTag}
                 />
               )}
+              {currentView === 'laporan' && (
+                <LaporanView 
+                  subActivities={subActivities} 
+                  tags={tags} 
+                  budgetTags={budgetTags} 
+                  opds={opds}
+                />
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
       </main>
+    </div>
+  );
+}
+
+// --- Shared Components ---
+
+function Modal({ title, isOpen, onClose, children }: { title: string, isOpen: boolean, onClose: () => void, children: React.ReactNode }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-surface w-full max-w-md rounded-[12px] border border-border shadow-2xl overflow-hidden"
+      >
+        <div className="p-4 px-6 border-b border-border flex items-center justify-between bg-slate-50">
+          <h3 className="font-bold text-text-main text-[16px]">{title}</h3>
+          <button onClick={onClose} className="text-text-muted hover:text-text-main transition-colors p-1 hover:bg-slate-200 rounded">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6">
+          {children}
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -234,33 +334,31 @@ function DashboardView({ subActivities, tags, budgetTags }: { subActivities: Sub
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
-          { label: 'Total Anggaran', value: `Rp ${(totalBudget / 1e9).toFixed(2)} M`, color: 'bg-blue-500' },
-          { label: 'Anggaran Terpapar', value: `Rp ${(taggedBudget / 1e9).toFixed(2)} M`, color: 'bg-emerald-500' },
-          { label: 'Tingkat Tagging', value: `${taggingPercentage.toFixed(1)}%`, color: 'bg-orange-500' },
-          { label: 'Jumlah Tag Aktif', value: chartData.length, color: 'bg-purple-500' },
+          { label: 'Total Anggaran 2024', value: `Rp ${(totalBudget / 1e9).toFixed(2)} T`, trend: 'Terkunci: 92%' },
+          { label: 'Sub-Kegiatan Tertagging', value: budgetTags.length.toLocaleString(), trend: '+12 minggu ini' },
+          { label: 'Alokasi Stunting', value: `Rp ${(taggedBudget / 1e9).toFixed(2)} M`, trend: 'Prioritas Utama', isAccent: true },
+          { label: 'Tingkat Tagging', value: `${taggingPercentage.toFixed(1)}%`, trend: 'Target: 100%' },
         ].map((stat, i) => (
           <motion.div 
             key={stat.label}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
+            className="bg-surface p-5 rounded-[8px] border border-border shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
           >
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{stat.label}</p>
-            <div className="flex items-end justify-between">
-              <h3 className="text-2xl font-black text-slate-800">{stat.value}</h3>
-              <div className={`${stat.color} w-2 h-8 rounded-full opacity-20`}></div>
-            </div>
+            <p className="text-[12px] font-semibold text-text-muted uppercase tracking-tight mb-2">{stat.label}</p>
+            <h3 className="text-[24px] font-bold text-primary">{stat.value}</h3>
+            <p className={`text-[12px] mt-1 font-medium ${stat.isAccent ? 'text-accent' : 'text-[#059669]'}`}>{stat.trend}</p>
           </motion.div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Pie Chart */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+        <div className="bg-surface p-8 rounded-[8px] border border-border shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="font-bold text-slate-800 italic">Distribusi Anggaran per Tagging</h3>
-            <BarChart3 size={20} className="text-slate-400" />
+            <h3 className="font-semibold text-text-main text-[14px]">Distribusi Anggaran per Tagging</h3>
+            <BarChart3 size={18} className="text-text-muted" />
           </div>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -278,7 +376,7 @@ function DashboardView({ subActivities, tags, budgetTags }: { subActivities: Sub
                 </Pie>
                 <Tooltip 
                   formatter={(value: number) => `Rp ${value.toLocaleString()}`}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
                 />
                 <Legend layout="vertical" align="right" verticalAlign="middle" />
               </PieChart>
@@ -287,10 +385,10 @@ function DashboardView({ subActivities, tags, budgetTags }: { subActivities: Sub
         </div>
 
         {/* Bar Chart */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+        <div className="bg-surface p-8 rounded-[8px] border border-border shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="font-bold text-slate-800 italic">Jumlah Sub-Kegiatan per Tagging</h3>
-            <Target size={20} className="text-slate-400" />
+            <h3 className="font-semibold text-text-main text-[14px]">Jumlah Sub-Kegiatan per Tagging</h3>
+            <Target size={18} className="text-text-muted" />
           </div>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -299,7 +397,7 @@ function DashboardView({ subActivities, tags, budgetTags }: { subActivities: Sub
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
                 <Tooltip cursor={{ fill: '#F8FAFC' }} />
-                <Bar dataKey="count" radius={[10, 10, 0, 0]}>
+                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
@@ -313,144 +411,658 @@ function DashboardView({ subActivities, tags, budgetTags }: { subActivities: Sub
   );
 }
 
-function MasterOPDView({ opds }: { opds: OPD[] }) {
+function MasterOPDView({ opds, onAdd, onUpdate, onDelete }: { 
+  opds: OPD[], 
+  onAdd: (o: Omit<OPD, 'id'>) => void,
+  onUpdate: (o: OPD) => void,
+  onDelete: (id: string) => void
+}) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingOpd, setEditingOpd] = useState<OPD | null>(null);
+  const [formData, setFormData] = useState({ name: '', code: '' });
+
+  const filtered = opds.filter(o => o.name.toLowerCase().includes(searchTerm.toLowerCase()) || o.code.includes(searchTerm));
+
+  const openAdd = () => {
+    setEditingOpd(null);
+    setFormData({ name: '', code: '' });
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (opd: OPD) => {
+    setEditingOpd(opd);
+    setFormData({ name: opd.name, code: opd.code });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingOpd) {
+      onUpdate({ ...editingOpd, ...formData });
+    } else {
+      onAdd(formData);
+    }
+    setIsModalOpen(false);
+  };
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Mock logic for importing
+      alert(`Importing ${file.name}... (Fitur ini sedang dalam pengembangan simulasinya)`);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <div className="flex items-center gap-4">
-          <div className="bg-white border border-slate-200 rounded-lg p-2 px-3 flex items-center gap-2">
-            <Search size={16} className="text-slate-400" />
-            <input type="text" placeholder="Cari OPD..." className="bg-transparent border-none outline-none text-sm w-48 lg:w-64" />
+    <div className="space-y-4">
+      <div className="bg-surface rounded-[8px] border border-border shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
+        <div className="p-4 border-b border-border flex items-center justify-between bg-slate-50/50">
+          <div className="flex items-center gap-4">
+            <div className="bg-surface border border-border rounded-[4px] p-2 px-3 flex items-center gap-2">
+              <Search size={14} className="text-text-muted" />
+              <input 
+                type="text" 
+                placeholder="Cari OPD..." 
+                className="bg-transparent border-none outline-none text-[13px] w-48 lg:w-64" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="bg-slate-100 text-text-muted px-4 py-2 rounded-[4px] text-[12px] font-semibold flex items-center gap-2 hover:bg-slate-200 transition-colors shadow-sm cursor-pointer border border-border">
+              <Upload size={16} /> Import Excel
+              <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
+            </label>
+            <button 
+              onClick={openAdd}
+              className="bg-primary text-white px-4 py-2 rounded-[4px] text-[12px] font-semibold flex items-center gap-2 hover:bg-opacity-90 transition-colors shadow-sm"
+            >
+              <Plus size={16} /> Tambah OPD
+            </button>
           </div>
         </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-colors">
-          <Plus size={18} /> Tambah OPD
-        </button>
-      </div>
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="border-b border-slate-100 italic text-[11px] uppercase tracking-widest text-slate-400">
-            <th className="px-6 py-4 font-bold">Kode</th>
-            <th className="px-6 py-4 font-bold">Nama OPD</th>
-            <th className="px-6 py-4 font-bold text-center">Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {opds.map((opd) => (
-            <tr key={opd.id} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors group">
-              <td className="px-6 py-4 font-mono text-xs text-blue-600 font-semibold">{opd.code}</td>
-              <td className="px-6 py-4 font-bold text-slate-700">{opd.name}</td>
-              <td className="px-6 py-4 flex justify-center gap-2">
-                <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors">Edit</button>
-                <button className="p-2 text-slate-400 hover:text-red-600 transition-colors">Hapus</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function MasterProgramView({ opds, programs, activities, subActivities }: { opds: OPD[], programs: Program[], activities: Activity[], subActivities: SubActivity[] }) {
-  return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
-         <div className="flex items-center gap-4">
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 px-3 flex items-center gap-2">
-            <Filter size={16} className="text-slate-400" />
-            <select className="bg-transparent border-none outline-none text-sm font-medium text-slate-600">
-              <option>Semua OPD</option>
-              {opds.map(opd => <option key={opd.id}>{opd.name}</option>)}
-            </select>
-          </div>
-        </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-colors">
-          <Plus size={18} /> Tambah Penomoran
-        </button>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse text-[13px]">
           <thead>
-            <tr className="border-b border-slate-100 italic text-[11px] uppercase tracking-widest text-slate-400">
-              <th className="px-6 py-4 font-bold">Kode</th>
-              <th className="px-6 py-4 font-bold">Nomenklatur (Program / Kegiatan / Sub-Kegiatan)</th>
-              <th className="px-6 py-4 font-bold text-right">Anggaran</th>
+            <tr className="bg-[#F8FAFC]">
+              <th className="px-6 py-4 font-semibold text-text-muted border-b border-border">Kode</th>
+              <th className="px-6 py-4 font-semibold text-text-muted border-b border-border">Nama OPD</th>
+              <th className="px-6 py-4 font-semibold text-text-muted border-b border-border text-center">Aksi</th>
             </tr>
           </thead>
           <tbody>
-            {programs.map(p => (
-              <>
-                <tr key={p.id} className="bg-slate-50/50">
-                  <td className="px-6 py-3 font-mono text-xs font-bold text-slate-900">{p.code}</td>
-                  <td className="px-6 py-3 font-black text-slate-800 text-sm uppercase">{p.name}</td>
-                  <td className="px-6 py-3"></td>
-                </tr>
-                {activities.filter(a => a.programId === p.id).map(a => (
-                  <>
-                    <tr key={a.id} className="bg-white">
-                      <td className="px-6 py-3 font-mono text-xs font-semibold text-slate-500 pl-10">{a.code}</td>
-                      <td className="px-6 py-3 font-bold text-slate-700 text-sm">{a.name}</td>
-                      <td className="px-6 py-3"></td>
-                    </tr>
-                    {subActivities.filter(s => s.activityId === a.id).map(s => (
-                      <tr key={s.id} className="bg-white border-b border-slate-50">
-                        <td className="px-6 py-3 font-mono text-xs text-blue-500 pl-16">{s.code}</td>
-                        <td className="px-6 py-3 text-slate-600 text-sm italic">{s.name}</td>
-                        <td className="px-6 py-3 text-right font-mono font-bold text-slate-900">Rp {s.budget.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </>
-                ))}
-              </>
+            {filtered.map((opd) => (
+              <tr key={opd.id} className="hover:bg-slate-50 transition-colors group border-b border-border">
+                <td className="px-6 py-4 font-mono text-[11px] text-primary font-semibold">{opd.code}</td>
+                <td className="px-6 py-4 font-semibold text-text-main">{opd.name}</td>
+                <td className="px-6 py-4">
+                  <div className="flex justify-center gap-2">
+                    <button 
+                      onClick={() => openEdit(opd)}
+                      className="p-1 px-3 text-primary hover:bg-primary/10 rounded transition-all font-medium flex items-center gap-1.5"
+                    >
+                      <Edit2 size={12} /> Edit
+                    </button>
+                    <button 
+                      onClick={() => onDelete(opd.id)}
+                      className="p-1 px-3 text-red-600 hover:bg-red-50 rounded transition-all font-medium flex items-center gap-1.5"
+                    >
+                      <Trash2 size={12} /> Hapus
+                    </button>
+                  </div>
+                </td>
+              </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <Modal title={editingOpd ? 'Edit OPD' : 'Tambah OPD'} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Kode OPD</label>
+            <input 
+              required
+              className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              placeholder="Contoh: 1.01.01"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Nama OPD</label>
+            <input 
+              required
+              className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Contoh: Dinas Kesehatan"
+            />
+          </div>
+          <div className="pt-4 flex gap-3">
+            <button 
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="flex-1 py-2 text-[12px] font-bold text-text-muted border border-border rounded hover:bg-slate-50"
+            >
+              BATAL
+            </button>
+            <button 
+              type="submit"
+              className="flex-1 py-2 text-[12px] font-bold text-white bg-primary rounded hover:bg-opacity-90 flex items-center justify-center gap-2"
+            >
+              <Save size={14} /> SIMPAN DATA
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
 
-function MasterTagView({ tags }: { tags: Tag[] }) {
+function MasterProgramView({ 
+  opds, programs, activities, subActivities,
+  onAddProgram, onAddActivity, onAddSubActivity, onDeleteSubActivity
+}: { 
+  opds: OPD[], 
+  programs: Program[], 
+  activities: Activity[], 
+  subActivities: SubActivity[],
+  onAddProgram: (p: Omit<Program, 'id'>) => void,
+  onAddActivity: (a: Omit<Activity, 'id'>) => void,
+  onAddSubActivity: (s: Omit<SubActivity, 'id'>) => void,
+  onDeleteSubActivity: (id: string) => void
+}) {
+  const [selectedOpdId, setSelectedOpdId] = useState<string>('all');
+  const [expandedProgramIds, setExpandedProgramIds] = useState<Set<string>>(new Set());
+  const [expandedActivityIds, setExpandedActivityIds] = useState<Set<string>>(new Set());
+  
+  const [modalMode, setModalMode] = useState<'program' | 'activity' | 'sub'>('program');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [parentOpdId, setParentOpdId] = useState<string>(opds[0]?.id || '');
+  const [parentProgramId, setParentProgramId] = useState<string>('');
+  const [parentActivityId, setParentActivityId] = useState<string>('');
+
+  const [formData, setFormData] = useState({ name: '', code: '', budget: 0 });
+
+  const toggleProgram = (id: string) => {
+    const next = new Set(expandedProgramIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setExpandedProgramIds(next);
+  };
+
+  const toggleActivity = (id: string) => {
+    const next = new Set(expandedActivityIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setExpandedActivityIds(next);
+  };
+
+  const openAddProgram = () => {
+    setModalMode('program');
+    setFormData({ name: '', code: '', budget: 0 });
+    setParentOpdId(selectedOpdId === 'all' ? opds[0]?.id : selectedOpdId);
+    setIsModalOpen(true);
+  };
+
+  const openAddActivity = (programId: string) => {
+    setModalMode('activity');
+    setFormData({ name: '', code: '', budget: 0 });
+    setParentProgramId(programId);
+    setIsModalOpen(true);
+  };
+
+  const openAddSub = (activityId: string) => {
+    setModalMode('sub');
+    setFormData({ name: '', code: '', budget: 0 });
+    setParentActivityId(activityId);
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (modalMode === 'program') {
+      onAddProgram({ name: formData.name, code: formData.code, opdId: parentOpdId });
+    } else if (modalMode === 'activity') {
+      onAddActivity({ name: formData.name, code: formData.code, programId: parentProgramId });
+    } else {
+      onAddSubActivity({ name: formData.name, code: formData.code, activityId: parentActivityId, budget: formData.budget });
+    }
+    setIsModalOpen(false);
+  };
+
+  const filteredPrograms = programs.filter(p => selectedOpdId === 'all' || p.opdId === selectedOpdId);
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      alert(`Importing ${file.name}... (Fitur ini sedang dalam pengembangan simulasinya)`);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-        <h3 className="font-bold text-slate-800 italic">Daftar Label Tagging</h3>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-colors">
-          <Plus size={18} /> Tambah Tag
-        </button>
+    <div className="space-y-6">
+      <div className="bg-surface p-4 px-6 rounded-[8px] border border-border flex items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+         <div className="flex items-center gap-4">
+          <div className="bg-surface border border-border rounded-[4px] p-2 px-3 flex items-center gap-2">
+            <Filter size={14} className="text-text-muted" />
+            <select 
+              value={selectedOpdId}
+              onChange={(e) => setSelectedOpdId(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-text-main"
+            >
+              <option value="all">Semua OPD</option>
+              {opds.map(opd => <option key={opd.id} value={opd.id}>{opd.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="bg-slate-100 text-text-muted px-4 py-2 rounded-[4px] text-[12px] font-semibold flex items-center gap-2 hover:bg-slate-200 transition-colors shadow-sm cursor-pointer border border-border">
+            <Upload size={16} /> Import Excel
+            <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
+          </label>
+          <button 
+            onClick={openAddProgram}
+            className="bg-primary text-white px-4 py-2 rounded-[4px] text-[12px] font-semibold flex items-center gap-2 hover:bg-opacity-90 transition-colors shadow-sm"
+          >
+            <Plus size={16} /> Tambah Program
+          </button>
+        </div>
       </div>
-      <table className="w-full text-left border-collapse">
+
+      <div className="bg-surface rounded-[8px] border border-border shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
+        <table className="w-full text-left border-collapse text-[13px]">
+          <thead>
+            <tr className="bg-[#F8FAFC]">
+              <th className="px-6 py-4 font-semibold text-text-muted border-b border-border">Kode</th>
+              <th className="px-6 py-4 font-semibold text-text-muted border-b border-border">Nomanclature</th>
+              <th className="px-6 py-4 font-semibold text-text-muted border-b border-border text-right">Anggaran</th>
+              <th className="px-6 py-4 font-semibold text-text-muted border-b border-border text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredPrograms.map(p => (
+              <React.Fragment key={p.id}>
+                <tr className="bg-slate-50/50 group">
+                  <td className="px-6 py-3 font-mono text-[11px] font-bold text-text-main flex items-center gap-2">
+                    <button onClick={() => toggleProgram(p.id)} className="p-1 hover:bg-white rounded transition-colors">
+                      {expandedProgramIds.has(p.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </button>
+                    {p.code}
+                  </td>
+                  <td className="px-6 py-3 font-bold text-text-main text-[13px] uppercase">{p.name}</td>
+                  <td className="px-6 py-3"></td>
+                  <td className="px-6 py-3 text-right">
+                    <button 
+                      onClick={() => openAddActivity(p.id)}
+                      className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors"
+                    >
+                      TAMBAH KEGIATAN
+                    </button>
+                  </td>
+                </tr>
+                {expandedProgramIds.has(p.id) && activities.filter(a => a.programId === p.id).map(a => (
+                  <React.Fragment key={a.id}>
+                    <tr className="bg-surface group">
+                      <td className="px-6 py-3 font-mono text-[11px] font-semibold text-text-muted pl-12 flex items-center gap-2">
+                        <button onClick={() => toggleActivity(a.id)} className="p-1 hover:bg-slate-100 rounded transition-colors">
+                          {expandedActivityIds.has(a.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                        {a.code}
+                      </td>
+                      <td className="px-6 py-3 font-semibold text-text-main text-[13px]">{a.name}</td>
+                      <td className="px-6 py-3"></td>
+                      <td className="px-6 py-3 text-right">
+                         <button 
+                          onClick={() => openAddSub(a.id)}
+                          className="text-[10px] font-bold bg-amber-500/10 text-amber-600 px-2 py-1 rounded hover:bg-amber-500/20 transition-colors"
+                        >
+                          TAMBAH SUB
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedActivityIds.has(a.id) && subActivities.filter(s => s.activityId === a.id).map(s => (
+                      <tr key={s.id} className="bg-surface hover:bg-slate-50 transition-colors border-b border-border last:border-0 group">
+                        <td className="px-6 py-3 font-mono text-[11px] text-primary pl-24">{s.code}</td>
+                        <td className="px-6 py-3 text-text-muted text-[13px]">{s.name}</td>
+                        <td className="px-6 py-3 text-right font-mono font-bold text-primary">Rp {s.budget.toLocaleString()}</td>
+                        <td className="px-6 py-3 text-right">
+                          <button 
+                            onClick={() => onDeleteSubActivity(s.id)}
+                            className="p-1.5 text-text-muted hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal 
+        title={`Tambah ${modalMode === 'program' ? 'Program' : modalMode === 'activity' ? 'Kegiatan' : 'Sub-Kegiatan'}`} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Kode</label>
+            <input 
+              required
+              className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              placeholder="Contoh: 1.01.01"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Nomenklatur</label>
+            <input 
+              required
+              className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Contoh: Program Pelayanan"
+            />
+          </div>
+          {modalMode === 'sub' && (
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Anggaran (Rp)</label>
+              <input 
+                required
+                type="number"
+                className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+                value={formData.budget}
+                onChange={(e) => setFormData({ ...formData, budget: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+          )}
+          <div className="pt-4 flex gap-3">
+            <button 
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="flex-1 py-2 text-[12px] font-bold text-text-muted border border-border rounded hover:bg-slate-50"
+            >
+              BATAL
+            </button>
+            <button 
+              type="submit"
+              className="flex-1 py-2 text-[12px] font-bold text-white bg-primary rounded hover:bg-opacity-90 flex items-center justify-center gap-2"
+            >
+              <Save size={14} /> SIMPAN DATA
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+function MasterTagView({ tags, onAdd, onUpdate, onDelete }: { 
+  tags: Tag[],
+  onAdd: (t: Omit<Tag, 'id'>) => void,
+  onUpdate: (t: Tag) => void,
+  onDelete: (id: string) => void
+}) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<Tag | null>(null);
+  const [formData, setFormData] = useState({ name: '', color: '#000000', type: 'Daerah' as const });
+
+  const openAdd = () => {
+    setEditingTag(null);
+    setFormData({ name: '', color: '#FFD700', type: 'Daerah' });
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (tag: Tag) => {
+    setEditingTag(tag);
+    setFormData({ name: tag.name, color: tag.color, type: tag.type });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingTag) {
+      onUpdate({ ...editingTag, ...formData });
+    } else {
+      onAdd(formData);
+    }
+    setIsModalOpen(false);
+  };
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      alert(`Importing ${file.name}... (Fitur ini sedang dalam pengembangan simulasinya)`);
+    }
+  };
+
+  return (
+    <div className="bg-surface rounded-[8px] border border-border shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
+      <div className="p-4 px-6 border-b border-border flex items-center justify-between bg-slate-50/50">
+        <h3 className="font-semibold text-text-main text-[14px]">Daftar Tagging Prioritas</h3>
+        <div className="flex items-center gap-2">
+          <label className="bg-slate-100 text-text-muted px-4 py-2 rounded-[4px] text-[12px] font-semibold flex items-center gap-2 hover:bg-slate-200 transition-colors shadow-sm cursor-pointer border border-border">
+            <Upload size={16} /> Import Excel
+            <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
+          </label>
+          <button 
+            onClick={openAdd}
+            className="bg-primary text-white px-4 py-2 rounded-[4px] text-[12px] font-semibold flex items-center gap-2 hover:bg-opacity-90 transition-colors shadow-sm"
+          >
+            <Plus size={16} /> Tambah Tagging
+          </button>
+        </div>
+      </div>
+      <table className="w-full text-left border-collapse text-[13px]">
         <thead>
-          <tr className="border-b border-slate-100 italic text-[11px] uppercase tracking-widest text-slate-400">
-            <th className="px-6 py-4 font-bold">Warna</th>
-            <th className="px-6 py-4 font-bold">Nama Tag</th>
-            <th className="px-6 py-4 font-bold">Tipe</th>
-            <th className="px-6 py-4 font-bold text-center">Aksi</th>
+          <tr className="bg-[#F8FAFC]">
+            <th className="px-6 py-4 font-semibold text-text-muted border-b border-border">Warna</th>
+            <th className="px-6 py-4 font-semibold text-text-muted border-b border-border">Kategori Tagging</th>
+            <th className="px-6 py-4 font-semibold text-text-muted border-b border-border">Prioritas</th>
+            <th className="px-6 py-4 font-semibold text-text-muted border-b border-border text-right">Aksi</th>
           </tr>
         </thead>
         <tbody>
           {tags.map((tag) => (
-            <tr key={tag.id} className="border-b border-slate-50">
+            <tr key={tag.id} className="hover:bg-slate-50 transition-colors border-b border-border">
               <td className="px-6 py-4">
-                <div className="w-6 h-6 rounded-full shadow-inner" style={{ backgroundColor: tag.color }}></div>
+                <div className="w-4 h-4 rounded-full shadow-inner" style={{ backgroundColor: tag.color }}></div>
               </td>
-              <td className="px-6 py-4 font-bold text-slate-700">{tag.name}</td>
               <td className="px-6 py-4">
-                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight ${
-                  tag.type === 'Prioritas Nasional' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                <span className={`inline-block px-3 py-1 rounded-[99px] text-[11px] font-medium border ${
+                  tag.name.toLowerCase().includes('stunting') ? 'bg-[#FEE2E2] text-[#991B1B] border-[#FECACA]' :
+                  tag.name.toLowerCase().includes('kemiskinan') ? 'bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]' :
+                  tag.name.toLowerCase().includes('digital') ? 'bg-[#DBEAFE] text-[#1E40AF] border-[#BFDBFE]' :
+                  'bg-[#E2E8F0] text-text-main border-border'
                 }`}>
-                  {tag.type}
+                  {tag.name}
                 </span>
               </td>
-              <td className="px-6 py-4 flex justify-center gap-2 text-sm">
-                <button className="text-slate-400 hover:text-blue-600 font-bold">Edit</button>
+              <td className="px-6 py-4 text-text-muted font-medium">
+                {tag.type === 'Prioritas Nasional' ? 'Nasional' : 'Daerah'}
+              </td>
+              <td className="px-6 py-4 text-right">
+                <div className="flex justify-end gap-2">
+                  <button 
+                    onClick={() => openEdit(tag)}
+                    className="p-1 px-3 text-primary hover:bg-primary/10 rounded font-medium flex items-center gap-1.5"
+                  >
+                    <Edit2 size={12} /> Edit
+                  </button>
+                  <button 
+                    onClick={() => onDelete(tag.id)}
+                    className="p-1 px-3 text-red-600 hover:bg-red-50 rounded font-medium flex items-center gap-1.5"
+                  >
+                    <Trash2 size={12} /> Hapus
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      <Modal title={editingTag ? 'Edit Tagging' : 'Tambah Tagging'} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Nama Tagging</label>
+            <input 
+              required
+              className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Contoh: Digitalisasi"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Warna</label>
+            <div className="flex gap-2">
+              <input 
+                type="color"
+                className="w-10 h-10 border-none bg-transparent cursor-pointer"
+                value={formData.color}
+                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+              />
+              <input 
+                className="flex-1 bg-background border border-border rounded p-2 text-[13px] outline-none"
+                value={formData.color}
+                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Tipe Prioritas</label>
+            <select 
+              className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+            >
+              <option value="Daerah">Prioritas Daerah</option>
+              <option value="Prioritas Nasional">Prioritas Nasional</option>
+            </select>
+          </div>
+          <div className="pt-4 flex gap-3">
+            <button 
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="flex-1 py-2 text-[12px] font-bold text-text-muted border border-border rounded hover:bg-slate-50"
+            >
+              BATAL
+            </button>
+            <button 
+              type="submit"
+              className="flex-1 py-2 text-[12px] font-bold text-white bg-primary rounded hover:bg-opacity-90 flex items-center justify-center gap-2"
+            >
+              <Save size={14} /> SIMPAN DATA
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+function LaporanView({ subActivities, tags, budgetTags, opds }: { 
+  subActivities: SubActivity[], 
+  tags: Tag[], 
+  budgetTags: BudgetTag[],
+  opds: OPD[]
+}) {
+  const [selectedTag, setSelectedTag] = useState<string>('all');
+  
+  const reportData = useMemo(() => {
+    let filteredTags = tags;
+    if (selectedTag !== 'all') {
+      filteredTags = tags.filter(t => t.id === selectedTag);
+    }
+
+    return filteredTags.map(tag => {
+      const links = budgetTags.filter(bt => bt.tagId === tag.id);
+      const items = links.map(link => {
+        const sub = subActivities.find(s => s.id === link.subActivityId);
+        return sub;
+      }).filter(Boolean) as SubActivity[];
+
+      const totalBudget = items.reduce((sum, s) => sum + s.budget, 0);
+
+      return {
+        tag,
+        items,
+        totalBudget
+      };
+    }).filter(d => d.items.length > 0);
+  }, [tags, budgetTags, subActivities, selectedTag]);
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-surface p-4 px-6 rounded-[8px] border border-border flex flex-wrap gap-4 items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+        <div className="flex items-center gap-4">
+          <div className="bg-surface border border-border rounded-[4px] p-2 px-3 flex items-center gap-2">
+            <Filter size={14} className="text-text-muted" />
+            <select 
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-text-main"
+            >
+              <option value="all">Semua Kategori Tagging</option>
+              {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <button className="bg-primary text-white px-4 py-2 rounded-[4px] text-[12px] font-semibold flex items-center gap-2 hover:bg-opacity-90 transition-colors shadow-sm">
+          <FileText size={16} /> Export PDF/Excel
+        </button>
+      </div>
+
+      <div className="space-y-8">
+        {reportData.map(({ tag, items, totalBudget }) => (
+          <div key={tag.id} className="bg-surface rounded-[8px] border border-border shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="p-4 px-6 bg-slate-50/50 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }}></div>
+                <h3 className="font-bold text-text-main text-[15px] uppercase tracking-tight">{tag.name}</h3>
+                <span className="text-[11px] font-bold text-text-muted bg-white border border-border px-2 py-0.5 rounded">
+                  {items.length} Sub-Kegiatan
+                </span>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase font-bold text-text-muted tracking-wider leading-none">Total Alokasi</p>
+                <p className="text-[16px] font-bold text-primary">Rp {totalBudget.toLocaleString()}</p>
+              </div>
+            </div>
+            
+            <table className="w-full text-left border-collapse text-[13px]">
+              <thead>
+                <tr className="bg-white">
+                  <th className="px-6 py-3 font-semibold text-text-muted border-b border-border w-1/4">Kode Sub-Kegiatan</th>
+                  <th className="px-6 py-3 font-semibold text-text-muted border-b border-border">Nama Sub-Kegiatan</th>
+                  <th className="px-6 py-3 font-semibold text-text-muted border-b border-border text-right">Anggaran</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(sub => (
+                  <tr key={sub.id} className="hover:bg-slate-50 transition-colors border-b border-border last:border-0 font-medium">
+                    <td className="px-6 py-3 font-mono text-[11px] text-primary">{sub.code}</td>
+                    <td className="px-6 py-3 text-text-main">{sub.name}</td>
+                    <td className="px-6 py-3 text-right font-mono text-primary">Rp {sub.budget.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+        {reportData.length === 0 && (
+          <div className="bg-surface p-12 text-center rounded-[8px] border border-border italic text-text-muted shadow-sm">
+            Tidak ada data tagging untuk kriteria ini.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -469,13 +1081,13 @@ function TaggingView({ subActivities, tags, budgetTags, onToggleTag }: {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center justify-between">
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 px-4 flex items-center gap-3 w-full md:w-96">
-          <Search size={18} className="text-slate-400" />
+      <div className="bg-surface p-4 px-6 rounded-[8px] border border-border flex flex-wrap gap-4 items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+        <div className="bg-background border border-border rounded-[4px] p-2 px-4 flex items-center gap-3 w-full md:w-96">
+          <Search size={16} className="text-text-muted" />
           <input 
             type="text" 
             placeholder="Cari Sub-Kegiatan..." 
-            className="bg-transparent border-none outline-none text-sm w-full font-medium"
+            className="bg-transparent border-none outline-none text-[13px] w-full font-medium"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -483,9 +1095,9 @@ function TaggingView({ subActivities, tags, budgetTags, onToggleTag }: {
         
         <div className="flex gap-2">
           {tags.map(tag => (
-            <div key={tag.id} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full">
+            <div key={tag.id} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-[4px] border border-border">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></div>
-              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">{tag.name}</span>
+              <span className="text-[10px] font-bold text-text-muted uppercase tracking-tight">{tag.name}</span>
             </div>
           ))}
         </div>
@@ -496,32 +1108,32 @@ function TaggingView({ subActivities, tags, budgetTags, onToggleTag }: {
           <motion.div 
             layout
             key={sub.id} 
-            className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-blue-300 transition-all group"
+            className="bg-surface p-6 rounded-[8px] border border-border hover:border-accent transition-all group shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
           >
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-1.5 flex-1">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-bold">{sub.code}</span>
-                  <span className="text-xs font-bold text-slate-400 uppercase italic">Sub-Kegiatan</span>
+                  <span className="font-mono text-[11px] bg-slate-100 text-primary px-2 py-0.5 rounded font-bold border border-border">{sub.code}</span>
+                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Sub-Kegiatan</span>
                 </div>
-                <h4 className="font-bold text-slate-800 leading-tight">{sub.name}</h4>
-                <p className="text-xs font-mono font-black text-slate-900 mt-1">Rp {sub.budget.toLocaleString()}</p>
+                <h4 className="font-bold text-text-main leading-tight text-[15px]">{sub.name}</h4>
+                <p className="text-[14px] font-mono font-bold text-primary">Rp {sub.budget.toLocaleString()}</p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 md:justify-end shrink-0">
                 {tags.map(tag => {
                   const isActive = budgetTags.some(bt => bt.subActivityId === sub.id && bt.tagId === tag.id);
                   return (
                     <button
                       key={tag.id}
                       onClick={() => onToggleTag(sub.id, tag.id)}
-                      className={`px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all flex items-center gap-2 border-2 ${
+                      className={`px-3 py-1.5 rounded-[4px] text-[11px] font-semibold transition-all flex items-center gap-2 border-2 ${
                         isActive 
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
-                          : 'bg-white border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-500'
+                          ? 'bg-primary border-primary text-white shadow-sm' 
+                          : 'bg-surface border-border text-text-muted hover:border-accent hover:text-accent'
                       }`}
                     >
-                      <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-white' : ''}`} style={{ backgroundColor: isActive ? '#FFF' : tag.color }}></div>
+                      {!isActive && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }}></div>}
                       {tag.name}
                     </button>
                   );
