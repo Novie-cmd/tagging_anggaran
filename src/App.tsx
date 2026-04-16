@@ -198,6 +198,46 @@ export default function App() {
     { id: 'laporan', label: 'Laporan Tagging', icon: FileText },
   ];
 
+  if (!isAuthReady) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-primary gap-4">
+        <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+        <p className="text-white/60 text-sm font-medium animate-pulse">Menghubungkan ke Server...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#F1F5F9] p-4 font-sans">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white w-full max-w-[400px] rounded-[16px] border border-border shadow-2xl overflow-hidden p-8 flex flex-col items-center text-center"
+        >
+          <div className="w-16 h-20 rounded-[8px] bg-[#FFD700] flex items-center justify-center mb-6 shadow-lg">
+            <span className="font-bold text-xl text-primary text-center leading-tight uppercase">NTB</span>
+          </div>
+          <h2 className="text-2xl font-bold text-text-main mb-2">E-Tagging NTB</h2>
+          <p className="text-text-muted text-sm mb-8">Sistem Informasi Tagging Anggaran Prioritas Provinsi Nusa Tenggara Barat</p>
+          
+          <button 
+            onClick={login}
+            className="w-full flex items-center justify-center gap-3 bg-primary text-white px-6 py-4 rounded-[8px] font-bold text-sm shadow-xl hover:bg-opacity-90 transition-all active:scale-95 group"
+          >
+            <LogIn size={20} className="group-hover:translate-x-1 transition-transform" /> 
+            Masuk dengan Google
+          </button>
+          
+          <p className="mt-8 text-[11px] text-text-muted leading-relaxed">
+            Gunakan akun email resmi <b>@gmail.com</b> atau <b>@ntbprov.go.id</b><br/>
+            untuk mengakses database BKAD.
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-background font-sans text-text-main overflow-hidden">
       {/* Sidebar */}
@@ -216,79 +256,61 @@ export default function App() {
           )}
         </div>
 
-        {user ? (
-          <nav className="flex-1 overflow-y-auto py-2 custom-scrollbar">
-            <ul className="space-y-1">
-              {navItems.map((item) => (
-                <li key={item.id}>
-                  {item.children ? (
-                    <div className="mt-4">
-                      {isSidebarOpen && (
-                        <p className="px-6 py-2 text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
-                          {item.label}
-                        </p>
-                      )}
-                      {item.children.map(child => (
-                        <button
-                          key={child.id}
-                          onClick={() => setCurrentView(child.id as View)}
-                          className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
-                            currentView === child.id 
-                              ? 'bg-white/10 text-white' 
-                              : 'text-white/60 hover:bg-white/5 hover:text-white'
-                          }`}
-                        >
-                          {currentView === child.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
-                          <child.icon size={18} className={currentView === child.id ? 'text-accent' : ''} />
-                          {isSidebarOpen && <span className="font-medium text-[14px]">{child.label}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setCurrentView(item.id as View)}
-                      className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
-                        currentView === item.id 
-                          ? 'bg-white/10 text-white' 
-                          : 'text-white/60 hover:bg-white/5 hover:text-white'
-                      }`}
-                    >
-                      {currentView === item.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
-                      <item.icon size={18} className={currentView === item.id ? 'text-accent' : ''} />
-                      {isSidebarOpen && <span className="font-medium text-[14px]">{item.label}</span>}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ) : isAuthReady && (
-          <div className="flex-1 overflow-hidden flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-16 h-20 rounded-[8px] bg-[#FFD700] flex items-center justify-center mb-6 shadow-xl">
-              <span className="font-bold text-xl text-primary text-center leading-tight uppercase">NTB</span>
-            </div>
-            <h2 className="text-xl font-bold text-white mb-2 leading-tight">SiTAG Anggaran NTB</h2>
-            <p className="text-white/60 text-[11px] mb-8 max-w-[180px]">Silakan login menggunakan akun Google untuk mengakses dashboard.</p>
-            <button 
-              onClick={login}
-              className="flex items-center gap-2 bg-white text-primary px-5 py-2.5 rounded-[6px] font-bold text-[12px] shadow-xl hover:bg-slate-50 transition-all active:scale-95"
-            >
-              <LogIn size={16} /> Login
-            </button>
-          </div>
-        )}
+        <nav className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+          <ul className="space-y-1">
+            {navItems.map((item) => (
+              <li key={item.id}>
+                {item.children ? (
+                  <div className="mt-4">
+                    {isSidebarOpen && (
+                      <p className="px-6 py-2 text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
+                        {item.label}
+                      </p>
+                    )}
+                    {item.children.map(child => (
+                      <button
+                        key={child.id}
+                        onClick={() => setCurrentView(child.id as View)}
+                        className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
+                          currentView === child.id 
+                            ? 'bg-white/10 text-white' 
+                            : 'text-white/60 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        {currentView === child.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
+                        <child.icon size={18} className={currentView === child.id ? 'text-accent' : ''} />
+                        {isSidebarOpen && <span className="font-medium text-[14px]">{child.label}</span>}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setCurrentView(item.id as View)}
+                    className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
+                      currentView === item.id 
+                        ? 'bg-white/10 text-white' 
+                        : 'text-white/60 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    {currentView === item.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
+                    <item.icon size={18} className={currentView === item.id ? 'text-accent' : ''} />
+                    {isSidebarOpen && <span className="font-medium text-[14px]">{item.label}</span>}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-        {user && (
-          <div className="p-4 border-t border-white/10">
-            <button 
-              onClick={logout}
-              className="w-full flex items-center gap-3 px-4 py-2 text-white/40 hover:text-white transition-colors text-[12px] font-medium"
-            >
-              <LogOut size={16} />
-              {isSidebarOpen && <span>Logout Sesi</span>}
-            </button>
-          </div>
-        )}
+        <div className="p-4 border-t border-white/10">
+          <button 
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-2 text-white/40 hover:text-white transition-colors text-[12px] font-medium"
+          >
+            <LogOut size={16} />
+            {isSidebarOpen && <span>Logout Sesi</span>}
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
