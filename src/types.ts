@@ -34,7 +34,7 @@ export interface SubActivity {
 export interface Tag {
   id: string;
   name: string;
-  type: 'Prioritas Nasional' | 'Tematik';
+  type: 'Prioritas Nasional' | 'Daerah';
   color: string;
 }
 

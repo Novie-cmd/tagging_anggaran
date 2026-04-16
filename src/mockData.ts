@@ -31,10 +31,10 @@ export const INITIAL_SUB_ACTIVITIES: SubActivity[] = [
 
 export const INITIAL_TAGS: Tag[] = [
   { id: 't1', name: 'Prioritas Nasional', type: 'Prioritas Nasional', color: '#3b82f6' },
-  { id: 't2', name: 'Kemiskinan Extreme', type: 'Tematik', color: '#ef4444' },
-  { id: 't3', name: 'Investasi', type: 'Tematik', color: '#10b981' },
-  { id: 't4', name: 'Digitalisasi', type: 'Tematik', color: '#8b5cf6' },
-  { id: 't5', name: 'Stunting', type: 'Tematik', color: '#f59e0b' },
+  { id: 't2', name: 'Kemiskinan Extreme', type: 'Daerah', color: '#ef4444' },
+  { id: 't3', name: 'Investasi', type: 'Daerah', color: '#10b981' },
+  { id: 't4', name: 'Digitalisasi', type: 'Daerah', color: '#8b5cf6' },
+  { id: 't5', name: 'Stunting', type: 'Daerah', color: '#f59e0b' },
 ];
 
 export const INITIAL_BUDGET_TAGS: BudgetTag[] = [

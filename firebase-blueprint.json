@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "opd": {
+      "title": "OPD",
+      "description": "Organizational units (Organisasi Perangkat Daerah)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "code"]
+    },
+    "tag": {
+      "title": "Tag",
+      "description": "Tagging categories for budget prioritization",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "type": { "type": "string", "enum": ["Daerah", "Prioritas Nasional"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "color", "type"]
+    },
+    "program": {
+      "title": "Program",
+      "description": "Budget programs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "opdId": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["opdId", "name", "code"]
+    },
+    "activity": {
+      "title": "Activity",
+      "description": "Budget activities (Kegiatan)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "programId": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["programId", "name", "code"]
+    },
+    "subActivity": {
+      "title": "SubActivity",
+      "description": "Budget sub-activities (Sub Kegiatan)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "activityId": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "budget": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["activityId", "name", "code", "budget"]
+    },
+    "budgetTag": {
+      "title": "BudgetTag",
+      "description": "Association between sub-activities and tags",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "subActivityId": { "type": "string" },
+        "tagId": { "type": "string" }
+      },
+      "required": ["subActivityId", "tagId"]
+    },
+    "user": {
+      "title": "User",
+      "description": "Application users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "displayName": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/opds/{opdId}": {
+      "schema": "opd",
+      "description": "Master OPD collection"
+    },
+    "/tags/{tagId}": {
+      "schema": "tag",
+      "description": "Master tags collection"
+    },
+    "/programs/{programId}": {
+      "schema": "program",
+      "description": "Master programs collection"
+    },
+    "/activities/{activityId}": {
+      "schema": "activity",
+      "description": "Master activities collection"
+    },
+    "/subActivities/{subActivityId}": {
+      "schema": "subActivity",
+      "description": "Master sub-activities collection"
+    },
+    "/budgetTags/{budgetTagId}": {
+      "schema": "budgetTag",
+      "description": "Mapping of sub-activities to tags"
+    },
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "User profiles and roles"
+    }
+  }
+}

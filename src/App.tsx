@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Database, 
@@ -23,7 +23,9 @@ import {
   Trash2,
   Save,
   ChevronDown,
-  Upload
+  Upload,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -41,64 +43,148 @@ import {
 } from './mockData';
 import { OPD, Program, Activity, SubActivity, Tag, BudgetTag } from './types';
 
+// Firebase Imports
+import { auth, db } from './firebase';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut,
+  User
+} from 'firebase/auth';
+import { 
+  collection, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  setDoc,
+  serverTimestamp
+} from 'firebase/firestore';
+
 type View = 'dashboard' | 'opd' | 'program' | 'tag' | 'tagging' | 'laporan';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   
   // App State
-  const [opds, setOpds] = useState<OPD[]>(INITIAL_OPDS);
-  const [programs, setPrograms] = useState<Program[]>(INITIAL_PROGRAMS);
-  const [activities, setActivities] = useState<Activity[]>(INITIAL_ACTIVITIES);
-  const [subActivities, setSubActivities] = useState<SubActivity[]>(INITIAL_SUB_ACTIVITIES);
-  const [tags, setTags] = useState<Tag[]>(INITIAL_TAGS);
-  const [budgetTags, setBudgetTags] = useState<BudgetTag[]>(INITIAL_BUDGET_TAGS);
+  const [opds, setOpds] = useState<OPD[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [subActivities, setSubActivities] = useState<SubActivity[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [budgetTags, setBudgetTags] = useState<BudgetTag[]>([]);
+
+  // Auth Effect
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      setIsAuthReady(true);
+      if (u) {
+        // Bootstrap user document if not exists
+        const userRef = doc(db, 'users', u.uid);
+        await setDoc(userRef, {
+          email: u.email,
+          displayName: u.displayName,
+          role: u.email === 'noviharyanto062@gmail.com' ? 'admin' : 'user'
+        }, { merge: true });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Data Listeners Effect
+  useEffect(() => {
+    if (!user) {
+      // Clear data if not logged in
+      setOpds([]);
+      setPrograms([]);
+      setActivities([]);
+      setSubActivities([]);
+      setTags([]);
+      setBudgetTags([]);
+      return;
+    }
+
+    const unsubscribers = [
+      onSnapshot(collection(db, 'opds'), s => setOpds(s.docs.map(d => ({ ...d.data(), id: d.id } as OPD)))),
+      onSnapshot(collection(db, 'tags'), s => setTags(s.docs.map(d => ({ ...d.data(), id: d.id } as Tag)))),
+      onSnapshot(collection(db, 'programs'), s => setPrograms(s.docs.map(d => ({ ...d.data(), id: d.id } as Program)))),
+      onSnapshot(collection(db, 'activities'), s => setActivities(s.docs.map(d => ({ ...d.data(), id: d.id } as Activity)))),
+      onSnapshot(collection(db, 'subActivities'), s => setSubActivities(s.docs.map(d => ({ ...d.data(), id: d.id } as SubActivity)))),
+      onSnapshot(collection(db, 'budgetTags'), s => setBudgetTags(s.docs.map(d => d.data() as BudgetTag))),
+    ];
+
+    return () => unsubscribers.forEach(u => u());
+  }, [user]);
+
+  // Auth Handlers
+  const login = async () => {
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setCurrentView('dashboard');
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // CRUD Handlers
-  const addOPD = (o: Omit<OPD, 'id'>) => {
-    setOpds([...opds, { ...o, id: `opd-${Date.now()}` }]);
+  const addOPD = async (o: Omit<OPD, 'id'>) => {
+    await addDoc(collection(db, 'opds'), { ...o, createdAt: serverTimestamp() });
   };
-  const updateOPD = (updated: OPD) => {
-    setOpds(opds.map(o => o.id === updated.id ? updated : o));
+  const updateOPD = async (updated: OPD) => {
+    const { id, ...data } = updated;
+    await updateDoc(doc(db, 'opds', id), data);
   };
-  const deleteOPD = (id: string) => {
-    setOpds(opds.filter(o => o.id !== id));
-  };
-
-  const addTag = (t: Omit<Tag, 'id'>) => {
-    setTags([...tags, { ...t, id: `tag-${Date.now()}` }]);
-  };
-  const updateTag = (updated: Tag) => {
-    setTags(tags.map(t => t.id === updated.id ? updated : t));
-  };
-  const deleteTag = (id: string) => {
-    setTags(tags.filter(t => t.id !== id));
-    setBudgetTags(budgetTags.filter(bt => bt.tagId !== id));
+  const deleteOPD = async (id: string) => {
+    await deleteDoc(doc(db, 'opds', id));
   };
 
-  const addProgram = (p: Omit<Program, 'id'>) => {
-    setPrograms([...programs, { ...p, id: `p-${Date.now()}` }]);
+  const addTag = async (t: Omit<Tag, 'id'>) => {
+    await addDoc(collection(db, 'tags'), { ...t, createdAt: serverTimestamp() });
   };
-  const addActivity = (a: Omit<Activity, 'id'>) => {
-    setActivities([...activities, { ...a, id: `a-${Date.now()}` }]);
+  const updateTag = async (updated: Tag) => {
+    const { id, ...data } = updated;
+    await updateDoc(doc(db, 'tags', id), data);
   };
-  const addSubActivity = (s: Omit<SubActivity, 'id'>) => {
-    setSubActivities([...subActivities, { ...s, id: `s-${Date.now()}` }]);
-  };
-  const deleteSubActivity = (id: string) => {
-    setSubActivities(subActivities.filter(s => s.id !== id));
-    setBudgetTags(budgetTags.filter(bt => bt.subActivityId !== id));
+  const deleteTag = async (id: string) => {
+    await deleteDoc(doc(db, 'tags', id));
   };
 
-  const toggleTag = (subActivityId: string, tagId: string) => {
-    setBudgetTags(prev => {
-      const exists = prev.some(bt => bt.subActivityId === subActivityId && bt.tagId === tagId);
-      if (exists) {
-        return prev.filter(bt => !(bt.subActivityId === subActivityId && bt.tagId === tagId));
-      }
-      return [...prev, { subActivityId, tagId }];
-    });
+  const addProgram = async (p: Omit<Program, 'id'>) => {
+    await addDoc(collection(db, 'programs'), { ...p, createdAt: serverTimestamp() });
+  };
+  const addActivity = async (a: Omit<Activity, 'id'>) => {
+    await addDoc(collection(db, 'activities'), { ...a, createdAt: serverTimestamp() });
+  };
+  const addSubActivity = async (s: Omit<SubActivity, 'id'>) => {
+    await addDoc(collection(db, 'subActivities'), { ...s, createdAt: serverTimestamp() });
+  };
+  const deleteSubActivity = async (id: string) => {
+    await deleteDoc(doc(db, 'subActivities', id));
+  };
+
+  const toggleTag = async (subActivityId: string, tagId: string) => {
+    const docId = `${subActivityId}_${tagId}`;
+    const exists = budgetTags.some(bt => bt.subActivityId === subActivityId && bt.tagId === tagId);
+    if (exists) {
+      await deleteDoc(doc(db, 'budgetTags', docId));
+    } else {
+      await setDoc(doc(db, 'budgetTags', docId), { subActivityId, tagId });
+    }
   };
 
   const navItems = [
@@ -130,60 +216,79 @@ export default function App() {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-2 custom-scrollbar">
-          <ul className="space-y-1">
-            {navItems.map((item) => (
-              <li key={item.id}>
-                {item.children ? (
-                  <div className="mt-4">
-                    {isSidebarOpen && (
-                      <p className="px-6 py-2 text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
-                        {item.label}
-                      </p>
-                    )}
-                    {item.children.map(child => (
-                      <button
-                        key={child.id}
-                        onClick={() => setCurrentView(child.id as View)}
-                        className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
-                          currentView === child.id 
-                            ? 'bg-white/10 text-white' 
-                            : 'text-white/60 hover:bg-white/5 hover:text-white'
-                        }`}
-                      >
-                        {currentView === child.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
-                        <child.icon size={18} className={currentView === child.id ? 'text-accent' : ''} />
-                        {isSidebarOpen && <span className="font-medium text-[14px]">{child.label}</span>}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setCurrentView(item.id as View)}
-                    className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
-                      currentView === item.id 
-                        ? 'bg-white/10 text-white' 
-                        : 'text-white/60 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    {currentView === item.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
-                    <item.icon size={18} className={currentView === item.id ? 'text-accent' : ''} />
-                    {isSidebarOpen && <span className="font-medium text-[14px]">{item.label}</span>}
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </nav>
+        {user ? (
+          <nav className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+            <ul className="space-y-1">
+              {navItems.map((item) => (
+                <li key={item.id}>
+                  {item.children ? (
+                    <div className="mt-4">
+                      {isSidebarOpen && (
+                        <p className="px-6 py-2 text-[11px] font-bold text-white/40 uppercase tracking-[0.1em]">
+                          {item.label}
+                        </p>
+                      )}
+                      {item.children.map(child => (
+                        <button
+                          key={child.id}
+                          onClick={() => setCurrentView(child.id as View)}
+                          className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
+                            currentView === child.id 
+                              ? 'bg-white/10 text-white' 
+                              : 'text-white/60 hover:bg-white/5 hover:text-white'
+                          }`}
+                        >
+                          {currentView === child.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
+                          <child.icon size={18} className={currentView === child.id ? 'text-accent' : ''} />
+                          {isSidebarOpen && <span className="font-medium text-[14px]">{child.label}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setCurrentView(item.id as View)}
+                      className={`w-full flex items-center gap-3 px-6 py-3 transition-colors relative group ${
+                        currentView === item.id 
+                          ? 'bg-white/10 text-white' 
+                          : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      {currentView === item.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent" />}
+                      <item.icon size={18} className={currentView === item.id ? 'text-accent' : ''} />
+                      {isSidebarOpen && <span className="font-medium text-[14px]">{item.label}</span>}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ) : isAuthReady && (
+          <div className="flex-1 overflow-hidden flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-16 h-20 rounded-[8px] bg-[#FFD700] flex items-center justify-center mb-6 shadow-xl">
+              <span className="font-bold text-xl text-primary text-center leading-tight uppercase">NTB</span>
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2 leading-tight">SiTAG Anggaran NTB</h2>
+            <p className="text-white/60 text-[11px] mb-8 max-w-[180px]">Silakan login menggunakan akun Google untuk mengakses dashboard.</p>
+            <button 
+              onClick={login}
+              className="flex items-center gap-2 bg-white text-primary px-5 py-2.5 rounded-[6px] font-bold text-[12px] shadow-xl hover:bg-slate-50 transition-all active:scale-95"
+            >
+              <LogIn size={16} /> Login
+            </button>
+          </div>
+        )}
 
-        <div className="p-4 border-t border-white/10">
-          <button 
-            onClick={() => setSidebarOpen(!isSidebarOpen)}
-            className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-white/5 transition-colors text-white/50"
-          >
-            {isSidebarOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        </div>
+        {user && (
+          <div className="p-4 border-t border-white/10">
+            <button 
+              onClick={logout}
+              className="w-full flex items-center gap-3 px-4 py-2 text-white/40 hover:text-white transition-colors text-[12px] font-medium"
+            >
+              <LogOut size={16} />
+              {isSidebarOpen && <span>Logout Sesi</span>}
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* Main Content */}
@@ -202,11 +307,15 @@ export default function App() {
           
           <div className="flex items-center gap-4">
             <div className="text-right hidden md:block">
-              <p className="text-sm font-semibold text-text-main leading-none">Admin BKAD</p>
-              <p className="text-[12px] text-text-muted">Provinsi NTB</p>
+              <p className="text-sm font-semibold text-text-main leading-none">{user?.displayName || 'Admin BKAD'}</p>
+              <p className="text-[12px] text-text-muted">{user?.email || 'Provinsi NTB'}</p>
             </div>
-            <div className="w-9 h-9 rounded-full bg-border flex items-center justify-center font-bold text-text-muted text-sm shadow-sm ring-2 ring-background">
-              AD
+            <div className="w-9 h-9 rounded-full bg-border overflow-hidden flex items-center justify-center font-bold text-text-muted text-sm shadow-sm ring-2 ring-background">
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                user?.displayName?.charAt(0) || 'B'
+              )}
             </div>
           </div>
         </header>
@@ -313,7 +422,7 @@ function DashboardView({ subActivities, tags, budgetTags }: { subActivities: Sub
       const associatedSubActivities = budgetTags
         .filter(bt => bt.tagId === tag.id)
         .map(bt => subActivities.find(s => s.id === bt.subActivityId))
-        .filter(Boolean) as SubActivity[];
+        .filter((s): s is SubActivity => s !== undefined);
       
       const totalBudget = associatedSubActivities.reduce((sum, s) => sum + s.budget, 0);
       return {
