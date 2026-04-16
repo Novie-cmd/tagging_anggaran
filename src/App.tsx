@@ -61,7 +61,8 @@ import {
   doc, 
   query, 
   setDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDocFromServer
 } from 'firebase/firestore';
 
 type View = 'dashboard' | 'opd' | 'program' | 'tag' | 'tagging' | 'laporan';
@@ -101,7 +102,6 @@ export default function App() {
   // Data Listeners Effect
   useEffect(() => {
     if (!user) {
-      // Clear data if not logged in
       setOpds([]);
       setPrograms([]);
       setActivities([]);
@@ -110,6 +110,18 @@ export default function App() {
       setBudgetTags([]);
       return;
     }
+
+    // Test Firestore Connection
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, '_connection_test', 'ping'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Firestore Error: Client is offline. Checklist configuration.");
+        }
+      }
+    };
+    testConnection();
 
     const unsubscribers = [
       onSnapshot(collection(db, 'opds'), s => setOpds(s.docs.map(d => ({ ...d.data(), id: d.id } as OPD)))),
@@ -126,9 +138,24 @@ export default function App() {
   // Auth Handlers
   const login = async () => {
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch (err) {
-      console.error(err);
+      const provider = new GoogleAuthProvider();
+      // Force account selection to avoid persistent block sessions
+      provider.setCustomParameters({ prompt: 'select_account' });
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      console.error("Firebase Login Error:", err);
+      // Map specific error codes to user-friendly messages
+      let message = "Terjadi kesalahan saat login.";
+      if (err.code === 'auth/operation-not-allowed') {
+        message = "Metode login Google belum diaktifkan di Firebase Console.";
+      } else if (err.code === 'auth/unauthorized-domain') {
+        message = "Domain ini belum diizinkan untuk login di Firebase Console.";
+      } else if (err.code === 'auth/popup-blocked') {
+        message = "Popup diblokir oleh browser. Harap izinkan popup untuk situs ini.";
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        message = "Proses login dibatalkan karena popup ditutup.";
+      }
+      alert(`Login Gagal (${err.code}): ${message}\n\n${err.message}`);
     }
   };
 
