@@ -955,6 +955,17 @@ function MasterProgramView({
     setIsModalOpen(false);
   };
 
+  const getActBudget = (aId: string) => {
+    return subActivities
+      .filter(s => s.activityId === aId)
+      .reduce((acc, s) => acc + s.budget, 0);
+  };
+
+  const getProgBudget = (pId: string) => {
+    const progActivities = activities.filter(a => a.programId === pId);
+    return progActivities.reduce((acc, a) => acc + getActBudget(a.id), 0);
+  };
+
   const filteredPrograms = programs.filter(p => selectedOpdId === 'all' || p.opdId === selectedOpdId);
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1093,7 +1104,7 @@ function MasterProgramView({
                     {p.code}
                   </td>
                   <td className="px-6 py-3 font-bold text-text-main text-[13px] uppercase">{p.name}</td>
-                  <td className="px-6 py-3"></td>
+                  <td className="px-6 py-3 text-right font-mono font-bold text-primary">Rp {getProgBudget(p.id).toLocaleString()}</td>
                   <td className="px-6 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
@@ -1132,7 +1143,7 @@ function MasterProgramView({
                         {a.code}
                       </td>
                       <td className="px-6 py-3 font-semibold text-text-main text-[13px]">{a.name}</td>
-                      <td className="px-6 py-3"></td>
+                      <td className="px-6 py-3 text-right font-mono font-bold text-text-muted opacity-60">Rp {getActBudget(a.id).toLocaleString()}</td>
                       <td className="px-6 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-4">
                           <button 
