@@ -1082,16 +1082,19 @@ function MasterProgramView({
           <tbody>
             {filteredPrograms.map(p => (
               <React.Fragment key={p.id}>
-                <tr className="bg-slate-50/50 group">
+                <tr 
+                  className="bg-slate-50/50 group cursor-pointer hover:bg-slate-100 transition-colors"
+                  onClick={() => toggleProgram(p.id)}
+                >
                   <td className="px-6 py-3 font-mono text-[11px] font-bold text-text-main flex items-center gap-2">
-                    <button onClick={() => toggleProgram(p.id)} className="p-1 hover:bg-white rounded transition-colors text-text-muted">
+                    <div className="p-1 rounded text-text-muted">
                       {expandedProgramIds.has(p.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </button>
+                    </div>
                     {p.code}
                   </td>
                   <td className="px-6 py-3 font-bold text-text-main text-[13px] uppercase">{p.name}</td>
                   <td className="px-6 py-3"></td>
-                  <td className="px-6 py-3">
+                  <td className="px-6 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => openEditProgram(p)}
@@ -1118,16 +1121,19 @@ function MasterProgramView({
                 </tr>
                 {expandedProgramIds.has(p.id) && activities.filter(a => a.programId === p.id).map(a => (
                   <React.Fragment key={a.id}>
-                    <tr className="bg-surface group">
+                    <tr 
+                      className="bg-surface group cursor-pointer hover:bg-slate-50 transition-colors"
+                      onClick={() => toggleActivity(a.id)}
+                    >
                       <td className="px-6 py-3 font-mono text-[11px] font-semibold text-text-muted pl-12 flex items-center gap-2">
-                        <button onClick={() => toggleActivity(a.id)} className="p-1 hover:bg-slate-100 rounded transition-colors text-text-muted">
+                        <div className="p-1 rounded text-text-muted">
                           {expandedActivityIds.has(a.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </button>
+                        </div>
                         {a.code}
                       </td>
                       <td className="px-6 py-3 font-semibold text-text-main text-[13px]">{a.name}</td>
                       <td className="px-6 py-3"></td>
-                      <td className="px-6 py-3 text-right">
+                      <td className="px-6 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-4">
                           <button 
                             onClick={() => openEditActivity(a)}
