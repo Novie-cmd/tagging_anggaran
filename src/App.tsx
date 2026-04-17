@@ -194,11 +194,32 @@ export default function App() {
   const addProgram = async (p: Omit<Program, 'id'>) => {
     await addDoc(collection(db, 'programs'), { ...p, createdAt: serverTimestamp() });
   };
+  const updateProgram = async (updated: Program) => {
+    const { id, ...data } = updated;
+    await updateDoc(doc(db, 'programs', id), data);
+  };
+  const deleteProgram = async (id: string) => {
+    // Optional: Logic to delete children activities/sub-activities could be added here
+    await deleteDoc(doc(db, 'programs', id));
+  };
+
   const addActivity = async (a: Omit<Activity, 'id'>) => {
     await addDoc(collection(db, 'activities'), { ...a, createdAt: serverTimestamp() });
   };
+  const updateActivity = async (updated: Activity) => {
+    const { id, ...data } = updated;
+    await updateDoc(doc(db, 'activities', id), data);
+  };
+  const deleteActivity = async (id: string) => {
+    await deleteDoc(doc(db, 'activities', id));
+  };
+
   const addSubActivity = async (s: Omit<SubActivity, 'id'>) => {
     await addDoc(collection(db, 'subActivities'), { ...s, createdAt: serverTimestamp() });
+  };
+  const updateSubActivity = async (updated: SubActivity) => {
+    const { id, ...data } = updated;
+    await updateDoc(doc(db, 'subActivities', id), data);
   };
   const deleteSubActivity = async (id: string) => {
     await deleteDoc(doc(db, 'subActivities', id));
@@ -401,8 +422,13 @@ export default function App() {
                   activities={activities} 
                   subActivities={subActivities} 
                   onAddProgram={addProgram}
+                  onUpdateProgram={updateProgram}
+                  onDeleteProgram={deleteProgram}
                   onAddActivity={addActivity}
+                  onUpdateActivity={updateActivity}
+                  onDeleteActivity={deleteActivity}
                   onAddSubActivity={addSubActivity}
+                  onUpdateSubActivity={updateSubActivity}
                   onDeleteSubActivity={deleteSubActivity}
                 />
               )}
@@ -721,15 +747,22 @@ function MasterOPDView({ opds, onAdd, onUpdate, onDelete }: {
 
 function MasterProgramView({ 
   opds, programs, activities, subActivities,
-  onAddProgram, onAddActivity, onAddSubActivity, onDeleteSubActivity
+  onAddProgram, onUpdateProgram, onDeleteProgram,
+  onAddActivity, onUpdateActivity, onDeleteActivity,
+  onAddSubActivity, onUpdateSubActivity, onDeleteSubActivity
 }: { 
   opds: OPD[], 
   programs: Program[], 
   activities: Activity[], 
   subActivities: SubActivity[],
   onAddProgram: (p: Omit<Program, 'id'>) => void,
+  onUpdateProgram: (p: Program) => void,
+  onDeleteProgram: (id: string) => void,
   onAddActivity: (a: Omit<Activity, 'id'>) => void,
+  onUpdateActivity: (a: Activity) => void,
+  onDeleteActivity: (id: string) => void,
   onAddSubActivity: (s: Omit<SubActivity, 'id'>) => void,
+  onUpdateSubActivity: (s: SubActivity) => void,
   onDeleteSubActivity: (id: string) => void
 }) {
   const [selectedOpdId, setSelectedOpdId] = useState<string>('all');
@@ -738,6 +771,8 @@ function MasterProgramView({
   
   const [modalMode, setModalMode] = useState<'program' | 'activity' | 'sub'>('program');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  
   const [parentOpdId, setParentOpdId] = useState<string>(opds[0]?.id || '');
   const [parentProgramId, setParentProgramId] = useState<string>('');
   const [parentActivityId, setParentActivityId] = useState<string>('');
@@ -758,33 +793,69 @@ function MasterProgramView({
 
   const openAddProgram = () => {
     setModalMode('program');
+    setEditingItem(null);
     setFormData({ name: '', code: '', budget: 0 });
     setParentOpdId(selectedOpdId === 'all' ? opds[0]?.id : selectedOpdId);
     setIsModalOpen(true);
   };
 
+  const openEditProgram = (p: Program) => {
+    setModalMode('program');
+    setEditingItem(p);
+    setFormData({ name: p.name, code: p.code, budget: 0 });
+    setIsModalOpen(true);
+  };
+
   const openAddActivity = (programId: string) => {
     setModalMode('activity');
+    setEditingItem(null);
     setFormData({ name: '', code: '', budget: 0 });
     setParentProgramId(programId);
     setIsModalOpen(true);
   };
 
+  const openEditActivity = (a: Activity) => {
+    setModalMode('activity');
+    setEditingItem(a);
+    setFormData({ name: a.name, code: a.code, budget: 0 });
+    setIsModalOpen(true);
+  };
+
   const openAddSub = (activityId: string) => {
     setModalMode('sub');
+    setEditingItem(null);
     setFormData({ name: '', code: '', budget: 0 });
     setParentActivityId(activityId);
+    setIsModalOpen(true);
+  };
+
+  const openEditSub = (s: SubActivity) => {
+    setModalMode('sub');
+    setEditingItem(s);
+    setFormData({ name: s.name, code: s.code, budget: s.budget });
     setIsModalOpen(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (modalMode === 'program') {
-      onAddProgram({ name: formData.name, code: formData.code, opdId: parentOpdId });
+      if (editingItem) {
+        onUpdateProgram({ ...editingItem, name: formData.name, code: formData.code });
+      } else {
+        onAddProgram({ name: formData.name, code: formData.code, opdId: parentOpdId });
+      }
     } else if (modalMode === 'activity') {
-      onAddActivity({ name: formData.name, code: formData.code, programId: parentProgramId });
+      if (editingItem) {
+        onUpdateActivity({ ...editingItem, name: formData.name, code: formData.code });
+      } else {
+        onAddActivity({ name: formData.name, code: formData.code, programId: parentProgramId });
+      }
     } else {
-      onAddSubActivity({ name: formData.name, code: formData.code, activityId: parentActivityId, budget: formData.budget });
+      if (editingItem) {
+        onUpdateSubActivity({ ...editingItem, name: formData.name, code: formData.code, budget: formData.budget });
+      } else {
+        onAddSubActivity({ name: formData.name, code: formData.code, activityId: parentActivityId, budget: formData.budget });
+      }
     }
     setIsModalOpen(false);
   };
@@ -835,7 +906,7 @@ function MasterProgramView({
               <th className="px-6 py-4 font-semibold text-text-muted border-b border-border">Kode</th>
               <th className="px-6 py-4 font-semibold text-text-muted border-b border-border">Nomanclature</th>
               <th className="px-6 py-4 font-semibold text-text-muted border-b border-border text-right">Anggaran</th>
-              <th className="px-6 py-4 font-semibold text-text-muted border-b border-border text-right">Aksi</th>
+              <th className="px-6 py-4 font-semibold text-text-muted border-b border-border text-center">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -843,27 +914,43 @@ function MasterProgramView({
               <React.Fragment key={p.id}>
                 <tr className="bg-slate-50/50 group">
                   <td className="px-6 py-3 font-mono text-[11px] font-bold text-text-main flex items-center gap-2">
-                    <button onClick={() => toggleProgram(p.id)} className="p-1 hover:bg-white rounded transition-colors">
+                    <button onClick={() => toggleProgram(p.id)} className="p-1 hover:bg-white rounded transition-colors text-text-muted">
                       {expandedProgramIds.has(p.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
                     {p.code}
                   </td>
                   <td className="px-6 py-3 font-bold text-text-main text-[13px] uppercase">{p.name}</td>
                   <td className="px-6 py-3"></td>
-                  <td className="px-6 py-3 text-right">
-                    <button 
-                      onClick={() => openAddActivity(p.id)}
-                      className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors"
-                    >
-                      TAMBAH KEGIATAN
-                    </button>
+                  <td className="px-6 py-3">
+                    <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => openEditProgram(p)}
+                        className="p-1 text-primary hover:bg-primary/10 rounded transition-colors"
+                        title="Edit Program"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      <button 
+                        onClick={() => onDeleteProgram(p.id)}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Hapus Program"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                      <button 
+                        onClick={() => openAddActivity(p.id)}
+                        className="ml-2 text-[9px] font-bold bg-primary text-white px-2 py-0.5 rounded shadow-sm hover:bg-opacity-90 transition-colors uppercase tracking-wider"
+                      >
+                        + Kegiatan
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 {expandedProgramIds.has(p.id) && activities.filter(a => a.programId === p.id).map(a => (
                   <React.Fragment key={a.id}>
                     <tr className="bg-surface group">
                       <td className="px-6 py-3 font-mono text-[11px] font-semibold text-text-muted pl-12 flex items-center gap-2">
-                        <button onClick={() => toggleActivity(a.id)} className="p-1 hover:bg-slate-100 rounded transition-colors">
+                        <button onClick={() => toggleActivity(a.id)} className="p-1 hover:bg-slate-100 rounded transition-colors text-text-muted">
                           {expandedActivityIds.has(a.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </button>
                         {a.code}
@@ -871,12 +958,28 @@ function MasterProgramView({
                       <td className="px-6 py-3 font-semibold text-text-main text-[13px]">{a.name}</td>
                       <td className="px-6 py-3"></td>
                       <td className="px-6 py-3 text-right">
-                         <button 
-                          onClick={() => openAddSub(a.id)}
-                          className="text-[10px] font-bold bg-amber-500/10 text-amber-600 px-2 py-1 rounded hover:bg-amber-500/20 transition-colors"
-                        >
-                          TAMBAH SUB
-                        </button>
+                        <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-4">
+                          <button 
+                            onClick={() => openEditActivity(a)}
+                            className="p-1 text-primary hover:bg-primary/10 rounded transition-colors"
+                            title="Edit Kegiatan"
+                          >
+                            <Edit2 size={12} />
+                          </button>
+                          <button 
+                            onClick={() => onDeleteActivity(a.id)}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Hapus Kegiatan"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                          <button 
+                            onClick={() => openAddSub(a.id)}
+                            className="ml-2 text-[9px] font-bold bg-amber-500 text-white px-2 py-0.5 rounded shadow-sm hover:bg-opacity-90 transition-colors uppercase tracking-wider"
+                          >
+                            + Sub
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {expandedActivityIds.has(a.id) && subActivities.filter(s => s.activityId === a.id).map(s => (
@@ -884,13 +987,23 @@ function MasterProgramView({
                         <td className="px-6 py-3 font-mono text-[11px] text-primary pl-24">{s.code}</td>
                         <td className="px-6 py-3 text-text-muted text-[13px]">{s.name}</td>
                         <td className="px-6 py-3 text-right font-mono font-bold text-primary">Rp {s.budget.toLocaleString()}</td>
-                        <td className="px-6 py-3 text-right">
-                          <button 
-                            onClick={() => onDeleteSubActivity(s.id)}
-                            className="p-1.5 text-text-muted hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                        <td className="px-6 py-3">
+                          <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => openEditSub(s)}
+                              className="p-1 text-primary hover:bg-primary/10 rounded transition-colors"
+                              title="Edit Sub-Kegiatan"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                            <button 
+                              onClick={() => onDeleteSubActivity(s.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Hapus Sub-Kegiatan"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -903,7 +1016,7 @@ function MasterProgramView({
       </div>
 
       <Modal 
-        title={`Tambah ${modalMode === 'program' ? 'Program' : modalMode === 'activity' ? 'Kegiatan' : 'Sub-Kegiatan'}`} 
+        title={`${editingItem ? 'Edit' : 'Tambah'} ${modalMode === 'program' ? 'Program' : modalMode === 'activity' ? 'Kegiatan' : 'Sub-Kegiatan'}`} 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
       >
