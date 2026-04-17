@@ -28,6 +28,7 @@ import {
   LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import * as XLSX from 'xlsx';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
@@ -62,7 +63,9 @@ import {
   query, 
   setDoc,
   serverTimestamp,
-  getDocFromServer
+  getDocFromServer,
+  writeBatch,
+  getDocs
 } from 'firebase/firestore';
 
 type View = 'dashboard' | 'opd' | 'program' | 'tag' | 'tagging' | 'laporan';
@@ -189,6 +192,66 @@ export default function App() {
   };
   const deleteTag = async (id: string) => {
     await deleteDoc(doc(db, 'tags', id));
+  };
+
+  const bulkAddOPD = async (records: Omit<OPD, 'id'>[]) => {
+    const batch = writeBatch(db);
+    records.forEach(o => {
+      const ref = doc(collection(db, 'opds'));
+      batch.set(ref, { ...o, createdAt: serverTimestamp() });
+    });
+    await batch.commit();
+  };
+
+  const bulkAddTags = async (records: Omit<Tag, 'id'>[]) => {
+    const batch = writeBatch(db);
+    records.forEach(t => {
+      const ref = doc(collection(db, 'tags'));
+      batch.set(ref, { ...t, createdAt: serverTimestamp() });
+    });
+    await batch.commit();
+  };
+
+  const bulkAddPrograms = async (
+    programsList: Omit<Program, 'id'>[],
+    activitiesList: (Omit<Activity, 'id'> & { parentCode: string })[],
+    subActivitiesList: (Omit<SubActivity, 'id'> & { parentCode: string })[]
+  ) => {
+    // This is more complex because we need to link IDs
+    // For simplicity in import, we'll use a two-step process or manual ID mapping if codes are unique
+    const batch = writeBatch(db);
+    
+    // 1. Add programs and keep track of their IDs by code
+    const progMap: Record<string, string> = {};
+    for (const p of programsList) {
+      const ref = doc(collection(db, 'programs'));
+      batch.set(ref, { ...p, createdAt: serverTimestamp() });
+      progMap[p.code] = ref.id;
+    }
+
+    // 2. Add activities linked to programs
+    const actMap: Record<string, string> = {};
+    for (const a of activitiesList) {
+      const progId = progMap[a.parentCode] || programs.find(p => p.code === a.parentCode)?.id;
+      if (progId) {
+        const ref = doc(collection(db, 'activities'));
+        const { parentCode, ...data } = a;
+        batch.set(ref, { ...data, programId: progId, createdAt: serverTimestamp() });
+        actMap[a.code] = ref.id;
+      }
+    }
+
+    // 3. Add sub-activities linked to activities
+    for (const s of subActivitiesList) {
+      const actId = actMap[s.parentCode] || activities.find(a => a.code === s.parentCode)?.id;
+      if (actId) {
+        const ref = doc(collection(db, 'subActivities'));
+        const { parentCode, ...data } = s;
+        batch.set(ref, { ...data, activityId: actId, createdAt: serverTimestamp() });
+      }
+    }
+
+    await batch.commit();
   };
 
   const addProgram = async (p: Omit<Program, 'id'>) => {
@@ -413,6 +476,7 @@ export default function App() {
                   onAdd={addOPD}
                   onUpdate={updateOPD}
                   onDelete={deleteOPD}
+                  onBulkAdd={bulkAddOPD}
                 />
               )}
               {currentView === 'program' && (
@@ -430,6 +494,7 @@ export default function App() {
                   onAddSubActivity={addSubActivity}
                   onUpdateSubActivity={updateSubActivity}
                   onDeleteSubActivity={deleteSubActivity}
+                  onBulkAdd={bulkAddPrograms}
                 />
               )}
               {currentView === 'tag' && (
@@ -438,6 +503,7 @@ export default function App() {
                   onAdd={addTag}
                   onUpdate={updateTag}
                   onDelete={deleteTag}
+                  onBulkAdd={bulkAddTags}
                 />
               )}
               {currentView === 'tagging' && (
@@ -595,11 +661,12 @@ function DashboardView({ subActivities, tags, budgetTags }: { subActivities: Sub
   );
 }
 
-function MasterOPDView({ opds, onAdd, onUpdate, onDelete }: { 
+function MasterOPDView({ opds, onAdd, onUpdate, onDelete, onBulkAdd }: { 
   opds: OPD[], 
   onAdd: (o: Omit<OPD, 'id'>) => void,
   onUpdate: (o: OPD) => void,
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  onBulkAdd: (records: Omit<OPD, 'id'>[]) => void
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -632,10 +699,34 @@ function MasterOPDView({ opds, onAdd, onUpdate, onDelete }: {
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Mock logic for importing
-      alert(`Importing ${file.name}... (Fitur ini sedang dalam pengembangan simulasinya)`);
-    }
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const records = data.map(row => ({
+          code: String(row.Kode || row.kode || ''),
+          name: String(row.Nama || row.nama || row.Nomenklatur || row.nomenklatur || '')
+        })).filter(r => r.code && r.name);
+
+        if (records.length > 0) {
+          await onBulkAdd(records);
+          alert(`Berhasil mengimpor ${records.length} data OPD.`);
+        } else {
+          alert('Tidak ada data valid yang ditemukan di file Excel.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Gagal membaca file Excel. Pastikan format kolom adalah "Kode" dan "Nama".');
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   return (
@@ -749,7 +840,8 @@ function MasterProgramView({
   opds, programs, activities, subActivities,
   onAddProgram, onUpdateProgram, onDeleteProgram,
   onAddActivity, onUpdateActivity, onDeleteActivity,
-  onAddSubActivity, onUpdateSubActivity, onDeleteSubActivity
+  onAddSubActivity, onUpdateSubActivity, onDeleteSubActivity,
+  onBulkAdd
 }: { 
   opds: OPD[], 
   programs: Program[], 
@@ -763,7 +855,8 @@ function MasterProgramView({
   onDeleteActivity: (id: string) => void,
   onAddSubActivity: (s: Omit<SubActivity, 'id'>) => void,
   onUpdateSubActivity: (s: SubActivity) => void,
-  onDeleteSubActivity: (id: string) => void
+  onDeleteSubActivity: (id: string) => void,
+  onBulkAdd: (programs: any[], activities: any[], subActivities: any[]) => void
 }) {
   const [selectedOpdId, setSelectedOpdId] = useState<string>('all');
   const [expandedProgramIds, setExpandedProgramIds] = useState<Set<string>>(new Set());
@@ -864,9 +957,56 @@ function MasterProgramView({
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      alert(`Importing ${file.name}... (Fitur ini sedang dalam pengembangan simulasinya)`);
+    if (!file) return;
+
+    if (selectedOpdId === 'all') {
+      alert('Harap pilih OPD terlebih dahulu sebelum melakukan import program.');
+      return;
     }
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const pList: any[] = [];
+        const aList: any[] = [];
+        const sList: any[] = [];
+
+        data.forEach(row => {
+          const type = String(row.Tipe || row.tipe || '').toUpperCase();
+          const record = {
+            code: String(row.Kode || row.kode || ''),
+            name: String(row.Nama || row.nama || row.Nomenklatur || row.nomenklatur || ''),
+            parentCode: String(row.ParentCode || row.parentCode || row.Induk || row.induk || ''),
+            budget: parseInt(row.Anggaran || row.anggaran || 0)
+          };
+
+          if (type === 'PROGRAM') {
+            pList.push({ ...record, opdId: selectedOpdId });
+          } else if (type === 'KEGIATAN') {
+            aList.push(record);
+          } else if (type === 'SUB') {
+            sList.push(record);
+          }
+        });
+
+        if (pList.length > 0 || aList.length > 0 || sList.length > 0) {
+          await onBulkAdd(pList, aList, sList);
+          alert(`Berhasil mengimpor data Program/Kegiatan.`);
+        } else {
+          alert('Tidak ada data valid yang ditemukan. Pastikan kolom "Tipe" berisi PROGRAM, KEGIATAN, atau SUB.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Gagal membaca file Excel.');
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   return (
@@ -1074,11 +1214,12 @@ function MasterProgramView({
   );
 }
 
-function MasterTagView({ tags, onAdd, onUpdate, onDelete }: { 
+function MasterTagView({ tags, onAdd, onUpdate, onDelete, onBulkAdd }: { 
   tags: Tag[],
   onAdd: (t: Omit<Tag, 'id'>) => void,
   onUpdate: (t: Tag) => void,
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  onBulkAdd: (records: Omit<Tag, 'id'>[]) => void
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
@@ -1108,9 +1249,35 @@ function MasterTagView({ tags, onAdd, onUpdate, onDelete }: {
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      alert(`Importing ${file.name}... (Fitur ini sedang dalam pengembangan simulasinya)`);
-    }
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const records = data.map(row => ({
+          name: String(row.Nama || row.nama || ''),
+          color: String(row.Warna || row.warna || '#4F46E5'),
+          type: (row.Tipe || row.tipe || 'Daerah') as 'Daerah' | 'Prioritas Nasional'
+        })).filter(r => r.name);
+
+        if (records.length > 0) {
+          await onBulkAdd(records);
+          alert(`Berhasil mengimpor ${records.length} data Tagging.`);
+        } else {
+          alert('Tidak ada data valid yang ditemukan.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Gagal membaca file Excel.');
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   return (
