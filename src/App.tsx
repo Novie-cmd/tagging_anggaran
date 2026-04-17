@@ -512,6 +512,8 @@ export default function App() {
                   tags={tags} 
                   budgetTags={budgetTags} 
                   onToggleTag={toggleTag}
+                  onUpdateSubActivity={updateSubActivity}
+                  onDeleteSubActivity={deleteSubActivity}
                 />
               )}
               {currentView === 'laporan' && (
@@ -1546,17 +1548,36 @@ function LaporanView({ subActivities, tags, budgetTags, opds }: {
   );
 }
 
-function TaggingView({ subActivities, tags, budgetTags, onToggleTag }: { 
+function TaggingView({ subActivities, tags, budgetTags, onToggleTag, onUpdateSubActivity, onDeleteSubActivity }: { 
   subActivities: SubActivity[], 
   tags: Tag[], 
   budgetTags: BudgetTag[],
-  onToggleTag: (sId: string, tId: string) => void
+  onToggleTag: (sId: string, tId: string) => void,
+  onUpdateSubActivity: (s: SubActivity) => void,
+  onDeleteSubActivity: (id: string) => void
 }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSub, setEditingSub] = useState<SubActivity | null>(null);
+  const [formData, setFormData] = useState({ name: '', code: '', budget: 0 });
   
   const filtered = useMemo(() => {
     return subActivities.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.code.includes(searchTerm));
   }, [subActivities, searchTerm]);
+
+  const openEdit = (sub: SubActivity) => {
+    setEditingSub(sub);
+    setFormData({ name: sub.name, code: sub.code, budget: sub.budget });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingSub) {
+      onUpdateSubActivity({ ...editingSub, ...formData });
+    }
+    setIsModalOpen(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -1591,9 +1612,25 @@ function TaggingView({ subActivities, tags, budgetTags, onToggleTag }: {
           >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-1.5 flex-1">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-[11px] bg-slate-100 text-primary px-2 py-0.5 rounded font-bold border border-border">{sub.code}</span>
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Sub-Kegiatan</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[11px] bg-slate-100 text-primary px-2 py-0.5 rounded font-bold border border-border">{sub.code}</span>
+                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Sub-Kegiatan</span>
+                  </div>
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => openEdit(sub)}
+                      className="p-1 px-3 text-primary hover:bg-primary/10 rounded-full transition-all font-medium flex items-center gap-1 text-[11px]"
+                    >
+                      <Edit2 size={12} /> Edit
+                    </button>
+                    <button 
+                      onClick={() => onDeleteSubActivity(sub.id)}
+                      className="p-1 px-3 text-red-600 hover:bg-red-50 rounded-full transition-all font-medium flex items-center gap-1 text-[11px]"
+                    >
+                      <Trash2 size={12} /> Hapus
+                    </button>
+                  </div>
                 </div>
                 <h4 className="font-bold text-text-main leading-tight text-[15px]">{sub.name}</h4>
                 <p className="text-[14px] font-mono font-bold text-primary">Rp {sub.budget.toLocaleString()}</p>
@@ -1622,6 +1659,54 @@ function TaggingView({ subActivities, tags, budgetTags, onToggleTag }: {
           </motion.div>
         ))}
       </div>
+
+      <Modal title="Edit Sub-Kegiatan" isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Kode</label>
+            <input 
+              required
+              className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Nomenklatur</label>
+            <input 
+              required
+              className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Anggaran (Rp)</label>
+            <input 
+              required
+              type="number"
+              className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+              value={formData.budget}
+              onChange={(e) => setFormData({ ...formData, budget: parseInt(e.target.value) || 0 })}
+            />
+          </div>
+          <div className="pt-4 flex gap-3">
+            <button 
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="flex-1 py-2 text-[12px] font-bold text-text-muted border border-border rounded hover:bg-slate-50"
+            >
+              BATAL
+            </button>
+            <button 
+              type="submit"
+              className="flex-1 py-2 text-[12px] font-bold text-white bg-primary rounded hover:bg-opacity-90 flex items-center justify-center gap-2"
+            >
+              <Save size={14} /> SIMPAN PERUBAHAN
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
