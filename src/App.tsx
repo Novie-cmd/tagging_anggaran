@@ -959,11 +959,6 @@ function MasterProgramView({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (selectedOpdId === 'all') {
-      alert('Harap pilih OPD terlebih dahulu sebelum melakukan import program.');
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -987,7 +982,28 @@ function MasterProgramView({
           };
 
           if (type === 'PROGRAM') {
-            pList.push({ ...record, opdId: selectedOpdId });
+            // Attempt to resolve OPD ID
+            let targetOpdId = '';
+            const rawOpd = String(row.OPD || row.opd || row['Nama OPD'] || row['nama opd'] || row['Kode OPD'] || row['kode opd'] || '');
+            
+            if (rawOpd) {
+              const matchedOpd = opds.find(o => 
+                o.name.toLowerCase() === rawOpd.toLowerCase() || 
+                o.code.toLowerCase() === rawOpd.toLowerCase()
+              );
+              if (matchedOpd) targetOpdId = matchedOpd.id;
+            }
+
+            // Fallback to selected filter if no OPD is found in Excel
+            if (!targetOpdId && selectedOpdId !== 'all') {
+              targetOpdId = selectedOpdId;
+            }
+
+            if (targetOpdId) {
+              pList.push({ ...record, opdId: targetOpdId });
+            } else {
+              console.warn(`Skipping program ${record.code} because no valid OPD was found.`);
+            }
           } else if (type === 'KEGIATAN') {
             aList.push(record);
           } else if (type === 'SUB') {
@@ -999,7 +1015,7 @@ function MasterProgramView({
           await onBulkAdd(pList, aList, sList);
           alert(`Berhasil mengimpor data Program/Kegiatan.`);
         } else {
-          alert('Tidak ada data valid yang ditemukan. Pastikan kolom "Tipe" berisi PROGRAM, KEGIATAN, atau SUB.');
+          alert('Tidak ada data valid yang ditemukan. Pastikan kolom "Tipe" berisi PROGRAM, KEGIATAN, atau SUB, dan setiap PROGRAM memiliki kolom "OPD" (Nama atau Kode) jika filter "Semua OPD" sedang aktif.');
         }
       } catch (err) {
         console.error(err);
@@ -1161,6 +1177,19 @@ function MasterProgramView({
         onClose={() => setIsModalOpen(false)}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {modalMode === 'program' && !editingItem && (
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Target OPD</label>
+              <select 
+                required
+                className="w-full bg-background border border-border rounded p-2 text-[13px] outline-none focus:border-primary"
+                value={parentOpdId}
+                onChange={(e) => setParentOpdId(e.target.value)}
+              >
+                {opds.map(opd => <option key={opd.id} value={opd.id}>{opd.name}</option>)}
+              </select>
+            </div>
+          )}
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Kode</label>
             <input 
