@@ -968,58 +968,70 @@ function MasterProgramView({
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
-        const pList: any[] = [];
-        const aList: any[] = [];
+        const pMap: Record<string, any> = {};
+        const aMap: Record<string, any> = {};
         const sList: any[] = [];
 
         data.forEach(row => {
-          const type = String(row.Tipe || row.tipe || '').toUpperCase();
-          const record = {
-            code: String(row.Kode || row.kode || ''),
-            name: String(row.Nama || row.nama || row.Nomenklatur || row.nomenklatur || ''),
-            parentCode: String(row.ParentCode || row.parentCode || row.Induk || row.induk || ''),
-            budget: parseInt(row.Anggaran || row.anggaran || 0)
-          };
+          const opdName = String(row['NAMA SKPD'] || row['nama skpd'] || row['OPD'] || row['opd'] || '');
+          const progCode = String(row['kode PROGRAM'] || row['kode program'] || row['Kode Program'] || row['KODE PROGRAM'] || '');
+          const progName = String(row['PROGRAM'] || row['program'] || '');
+          const actCode = String(row['KODE KEGIATAN'] || row['kode kegiatan'] || row['Kode Kegiatan'] || '');
+          const actName = String(row['KEGIATAN'] || row['kegiatan'] || '');
+          const subCode = String(row['KODE SUB'] || row['kode sub'] || row['Kode Sub'] || '');
+          const subName = String(row['SUB'] || row['sub'] || '');
+          const budgetRaw = row['JUMLAH'] || row['jumlah'] || row['Jumlah'] || 0;
+          
+          let budget = 0;
+          if (typeof budgetRaw === 'number') {
+            budget = budgetRaw;
+          } else if (typeof budgetRaw === 'string') {
+            // Remove dots and replace comma with dot for parsing
+            const cleanBudget = budgetRaw.replace(/\./g, '').replace(/,/g, '.');
+            budget = parseFloat(cleanBudget) || 0;
+          }
 
-          if (type === 'PROGRAM') {
-            // Attempt to resolve OPD ID
-            let targetOpdId = '';
-            const rawOpd = String(row.OPD || row.opd || row['Nama OPD'] || row['nama opd'] || row['Kode OPD'] || row['kode opd'] || '');
+          // Resolve OPD
+          let targetOpdId = '';
+          if (opdName) {
+            const matchedOpd = opds.find(o => 
+              o.name.toLowerCase() === opdName.toLowerCase() || 
+              o.code.toLowerCase() === opdName.toLowerCase()
+            );
+            if (matchedOpd) targetOpdId = matchedOpd.id;
+          }
+
+          // Fallback to selected filter if no OPD is found in current row
+          if (!targetOpdId && selectedOpdId !== 'all') {
+            targetOpdId = selectedOpdId;
+          }
+
+          // We need at least an OPD and Program to start the hierarchy
+          if (targetOpdId && progCode && progName) {
+            pMap[progCode] = { code: progCode, name: progName, opdId: targetOpdId };
             
-            if (rawOpd) {
-              const matchedOpd = opds.find(o => 
-                o.name.toLowerCase() === rawOpd.toLowerCase() || 
-                o.code.toLowerCase() === rawOpd.toLowerCase()
-              );
-              if (matchedOpd) targetOpdId = matchedOpd.id;
+            if (actCode && actName) {
+              aMap[actCode] = { code: actCode, name: actName, parentCode: progCode };
+              
+              if (subCode && subName) {
+                sList.push({ code: subCode, name: subName, parentCode: actCode, budget });
+              }
             }
-
-            // Fallback to selected filter if no OPD is found in Excel
-            if (!targetOpdId && selectedOpdId !== 'all') {
-              targetOpdId = selectedOpdId;
-            }
-
-            if (targetOpdId) {
-              pList.push({ ...record, opdId: targetOpdId });
-            } else {
-              console.warn(`Skipping program ${record.code} because no valid OPD was found.`);
-            }
-          } else if (type === 'KEGIATAN') {
-            aList.push(record);
-          } else if (type === 'SUB') {
-            sList.push(record);
           }
         });
 
-        if (pList.length > 0 || aList.length > 0 || sList.length > 0) {
-          await onBulkAdd(pList, aList, sList);
-          alert(`Berhasil mengimpor data Program/Kegiatan.`);
+        const programsList = Object.values(pMap);
+        const activitiesList = Object.values(aMap);
+
+        if (programsList.length > 0 || activitiesList.length > 0 || sList.length > 0) {
+          await onBulkAdd(programsList, activitiesList, sList);
+          alert(`Berhasil mengimpor data Program/Kegiatan dari template flat.`);
         } else {
-          alert('Tidak ada data valid yang ditemukan. Pastikan kolom "Tipe" berisi PROGRAM, KEGIATAN, atau SUB, dan setiap PROGRAM memiliki kolom "OPD" (Nama atau Kode) jika filter "Semua OPD" sedang aktif.');
+          alert('Tidak ada data valid yang ditemukan. Pastikan header sesuai dengan template (NAMA SKPD, kode PROGRAM, PROGRAM, KODE KEGIATAN, KEGIATAN, KODE SUB, SUB, JUMLAH).');
         }
       } catch (err) {
         console.error(err);
-        alert('Gagal membaca file Excel.');
+        alert('Gagal membaca file Excel. Pastikan file tidak rusak dan format kolom benar.');
       }
     };
     reader.readAsBinaryString(file);
