@@ -1158,31 +1158,43 @@ function MasterProgramView({
                         </div>
                       </td>
                     </tr>
-                    {expandedActivityIds.has(a.id) && subActivities.filter(s => s.activityId === a.id).map(s => (
-                      <tr key={s.id} className="bg-surface hover:bg-slate-50 transition-colors border-b border-border last:border-0 group">
-                        <td className="px-6 py-3 font-mono text-[11px] text-primary pl-24">{s.code}</td>
-                        <td className="px-6 py-3 text-text-muted text-[13px]">{s.name}</td>
-                        <td className="px-6 py-3 text-right font-mono font-bold text-primary">Rp {s.budget.toLocaleString()}</td>
-                        <td className="px-6 py-3">
-                          <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={() => openEditSub(s)}
-                              className="p-1 text-primary hover:bg-primary/10 rounded transition-colors"
-                              title="Edit Sub-Kegiatan"
-                            >
-                              <Edit2 size={12} />
-                            </button>
-                            <button 
-                              onClick={() => onDeleteSubActivity(s.id)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                              title="Hapus Sub-Kegiatan"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {expandedActivityIds.has(a.id) && (
+                      subActivities.filter(s => s.activityId === a.id).length > 0 ? (
+                        subActivities.filter(s => s.activityId === a.id).map(s => (
+                          <tr key={s.id} className="bg-slate-50/30 hover:bg-slate-100/50 transition-colors border-b border-border/50 last:border-0 group">
+                            <td className="px-6 py-2.5 font-mono text-[10px] text-primary/70 pl-24 flex items-center gap-2">
+                              {s.code}
+                            </td>
+                            <td className="px-6 py-2.5 text-text-main text-[13px] font-medium italic border-l-2 border-primary/20">{s.name}</td>
+                            <td className="px-6 py-2.5 text-right font-mono font-bold text-primary bg-primary/5">
+                              Rp {s.budget.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-2.5">
+                              <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => openEditSub(s)}
+                                  className="p-1 text-primary hover:bg-primary/10 rounded transition-colors"
+                                  title="Edit Sub-Kegiatan"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                                <button 
+                                  onClick={() => onDeleteSubActivity(s.id)}
+                                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Hapus Sub-Kegiatan"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr className="bg-slate-50/20 italic text-[11px] text-text-muted">
+                          <td colSpan={4} className="px-6 py-2 pl-24">Belum ada sub-kegiatan di bawah kegiatan ini.</td>
+                        </tr>
+                      )
+                    )}
                   </React.Fragment>
                 ))}
               </React.Fragment>
