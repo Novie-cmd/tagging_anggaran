@@ -217,20 +217,31 @@ export default function App() {
     activitiesList: (Omit<Activity, 'id'> & { parentCode: string })[],
     subActivitiesList: (Omit<SubActivity, 'id'> & { parentCode: string })[]
   ) => {
-    // This is more complex because we need to link IDs
-    // For simplicity in import, we'll use a two-step process or manual ID mapping if codes are unique
-    const batch = writeBatch(db);
-    
-    // 1. Add programs and keep track of their IDs by code
     const progMap: Record<string, string> = {};
+    const actMap: Record<string, string> = {};
+    
+    // Step-by-step processing to stay within batch limits
+    const BATCH_LIMIT = 450;
+    
+    // 1. Programs
+    let batch = writeBatch(db);
+    let count = 0;
     for (const p of programsList) {
       const ref = doc(collection(db, 'programs'));
       batch.set(ref, { ...p, createdAt: serverTimestamp() });
       progMap[p.code] = ref.id;
+      count++;
+      if (count >= BATCH_LIMIT) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
     }
+    if (count > 0) await batch.commit();
 
-    // 2. Add activities linked to programs
-    const actMap: Record<string, string> = {};
+    // 2. Activities
+    batch = writeBatch(db);
+    count = 0;
     for (const a of activitiesList) {
       const progId = progMap[a.parentCode] || programs.find(p => p.code === a.parentCode)?.id;
       if (progId) {
@@ -238,20 +249,34 @@ export default function App() {
         const { parentCode, ...data } = a;
         batch.set(ref, { ...data, programId: progId, createdAt: serverTimestamp() });
         actMap[a.code] = ref.id;
+        count++;
+        if (count >= BATCH_LIMIT) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
       }
     }
+    if (count > 0) await batch.commit();
 
-    // 3. Add sub-activities linked to activities
+    // 3. Sub-activities
+    batch = writeBatch(db);
+    count = 0;
     for (const s of subActivitiesList) {
       const actId = actMap[s.parentCode] || activities.find(a => a.code === s.parentCode)?.id;
       if (actId) {
         const ref = doc(collection(db, 'subActivities'));
         const { parentCode, ...data } = s;
         batch.set(ref, { ...data, activityId: actId, createdAt: serverTimestamp() });
+        count++;
+        if (count >= BATCH_LIMIT) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
       }
     }
-
-    await batch.commit();
+    if (count > 0) await batch.commit();
   };
 
   const addProgram = async (p: Omit<Program, 'id'>) => {
@@ -1051,8 +1076,8 @@ function MasterProgramView({
           const progName = String(row['PROGRAM'] || row['program'] || '');
           const actCode = String(row['KODE KEGIATAN'] || row['kode kegiatan'] || row['Kode Kegiatan'] || '');
           const actName = String(row['KEGIATAN'] || row['kegiatan'] || '');
-          const subCode = String(row['KODE SUB'] || row['kode sub'] || row['Kode Sub'] || '');
-          const subName = String(row['SUB'] || row['sub'] || '');
+          const subCode = String(row['KODE SUB KEGIATAN'] || row['KODE SUB'] || row['kode sub'] || row['Kode Sub'] || '');
+          const subName = String(row['SUB KEGIATAN'] || row['SUB'] || row['sub'] || '');
           const budgetRaw = row['JUMLAH'] || row['jumlah'] || row['Jumlah'] || 0;
           
           let budget = 0;
@@ -1199,17 +1224,20 @@ function MasterProgramView({
                 {expandedProgramIds.has(p.id) && activities.filter(a => a.programId === p.id).map(a => (
                   <React.Fragment key={a.id}>
                     <tr 
-                      className="bg-surface group cursor-pointer hover:bg-slate-50 transition-colors"
+                      className={`group cursor-pointer transition-colors border-b border-border/40 ${expandedActivityIds.has(a.id) ? 'bg-slate-50' : 'bg-surface hover:bg-slate-50'}`}
                       onClick={() => toggleActivity(a.id)}
                     >
                       <td className="px-6 py-3 font-mono text-[11px] font-semibold text-text-muted pl-12 flex items-center gap-2">
-                        <div className="p-1 rounded text-text-muted">
-                          {expandedActivityIds.has(a.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        <div className={`p-1 rounded transition-transform ${expandedActivityIds.has(a.id) ? 'rotate-0 text-primary' : '-rotate-90 opacity-40'}`}>
+                          <ChevronDown size={14} />
                         </div>
                         {a.code}
                       </td>
                       <td className="px-6 py-3 font-semibold text-text-main text-[13px]">{a.name}</td>
-                      <td className="px-6 py-3 text-right font-mono font-bold text-text-muted opacity-60">Rp {getActBudget(a.id).toLocaleString()}</td>
+                      <td className="px-6 py-3 text-right font-mono font-bold text-text-main">
+                        <span className="text-text-muted text-[10px] mr-1 font-normal uppercase opacity-70">Total:</span> 
+                        Rp {getActBudget(a.id).toLocaleString()}
+                      </td>
                       <td className="px-6 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-4">
                           <button 
@@ -1237,52 +1265,59 @@ function MasterProgramView({
                     </tr>
                     {expandedActivityIds.has(a.id) && (
                       <React.Fragment>
-                        {subActivities.filter(s => s.activityId === a.id).length > 0 ? (
-                          subActivities.filter(s => s.activityId === a.id).map(s => (
-                            <tr key={s.id} className="bg-slate-50/20 group hover:bg-slate-100/40 transition-colors border-b border-slate-100 last:border-0">
-                              <td className="px-6 py-2 font-mono text-[9px] text-text-muted/60 pl-24 flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary/30" />
-                                {s.code}
-                              </td>
-                              <td className="px-6 py-2 border-l-2 border-primary/10">
-                                <div className="flex flex-col pl-4">
-                                  <span className="text-[12px] font-medium text-text-main leading-tight italic">{s.name}</span>
-                                  <span className="text-[9px] text-text-muted uppercase tracking-tighter opacity-70">Sub-Kegiatan</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-2 text-right">
-                                <div className="inline-block px-3 py-1 rounded-full bg-primary/5 border border-primary/10">
-                                  <span className="font-mono font-bold text-primary text-[12px]">Rp {s.budget.toLocaleString()}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-2 text-right">
-                                <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-4">
-                                  <button 
-                                    onClick={() => openEditSub(s)}
-                                    className="p-1 px-2 text-primary hover:bg-primary/10 rounded-full transition-colors flex items-center gap-1 text-[10px] font-bold"
-                                    title="Edit Sub-Kegiatan"
-                                  >
-                                    <Edit2 size={10} /> EDIT
-                                  </button>
-                                  <button 
-                                    onClick={() => onDeleteSubActivity(s.id)}
-                                    className="p-1 px-2 text-red-600 hover:bg-red-50 rounded-full transition-colors flex items-center gap-1 text-[10px] font-bold"
-                                    title="Hapus Sub-Kegiatan"
-                                  >
-                                    <Trash2 size={10} /> HAPUS
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr className="bg-slate-50/10 transition-colors">
-                            <td colSpan={4} className="px-6 py-4 pl-24 text-[11px] text-text-muted italic flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full border border-dashed border-text-muted/40" />
-                              Belum ada rincian sub-kegiatan di bawah kegiatan ini.
-                            </td>
-                          </tr>
-                        )}
+                        {(() => {
+                          const relevantSubs = subActivities.filter(s => s.activityId === a.id);
+                          if (relevantSubs.length > 0) {
+                            return relevantSubs.map(s => (
+                              <tr key={s.id} className="bg-white group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 shadow-[inset_4px_0_0_#3b82f6]">
+                                <td className="px-6 py-3 font-mono text-[10px] text-text-muted pl-24 flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                                  {s.code}
+                                </td>
+                                <td className="px-6 py-3">
+                                  <div className="flex flex-col">
+                                    <span className="text-[13px] font-medium text-text-main leading-none italic">{s.name}</span>
+                                    <span className="text-[9px] text-text-muted uppercase tracking-wider mt-1 opacity-50 font-bold">Rincian Sub-Kegiatan</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-3 text-right">
+                                  <div className="inline-block px-4 py-1.5 rounded-lg bg-primary/5 border border-primary/20 shadow-sm">
+                                    <span className="font-mono font-bold text-primary text-[13px]">Rp {s.budget.toLocaleString()}</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-3 text-right">
+                                  <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-4">
+                                    <button 
+                                      onClick={() => openEditSub(s)}
+                                      className="p-1.5 px-3 text-primary hover:bg-primary/10 rounded-full transition-colors flex items-center gap-1 text-[10px] font-bold border border-primary/20"
+                                      title="Edit Sub-Kegiatan"
+                                    >
+                                      <Edit2 size={12} /> EDIT
+                                    </button>
+                                    <button 
+                                      onClick={() => onDeleteSubActivity(s.id)}
+                                      className="p-1.5 px-3 text-red-600 hover:bg-red-50 rounded-full transition-colors flex items-center gap-1 text-[10px] font-bold border border-red-200"
+                                      title="Hapus Sub-Kegiatan"
+                                    >
+                                      <Trash2 size={12} /> HAPUS
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ));
+                          } else {
+                            return (
+                              <tr className="bg-slate-50/20 italic">
+                                <td colSpan={4} className="px-6 py-6 pl-24">
+                                  <div className="flex items-center gap-3 text-text-muted opacity-60">
+                                    <div className="w-8 h-px bg-border" />
+                                    <span className="text-[12px]">Belum ada data Sub-Kegiatan untuk item ini.</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+                        })()}
                       </React.Fragment>
                     )}
                   </React.Fragment>
