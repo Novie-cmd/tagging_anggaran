@@ -288,6 +288,64 @@ export default function App() {
     await deleteDoc(doc(db, 'subActivities', id));
   };
 
+  const clearAllProgramsData = async () => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus SEMUA data Program, Kegiatan, dan Sub-Kegiatan? Tindakan ini tidak dapat dibatalkan.')) return;
+    
+    try {
+      const batchSize = 500;
+      
+      // Delete Sub Activities
+      const subSnapshot = await getDocs(collection(db, 'subActivities'));
+      let batch = writeBatch(db);
+      let count = 0;
+      for (const d of subSnapshot.docs) {
+        batch.delete(d.ref);
+        count++;
+        if (count >= batchSize) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+      await batch.commit();
+
+      // Delete Activities
+      const actSnapshot = await getDocs(collection(db, 'activities'));
+      batch = writeBatch(db);
+      count = 0;
+      for (const d of actSnapshot.docs) {
+        batch.delete(d.ref);
+        count++;
+        if (count >= batchSize) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+      await batch.commit();
+
+      // Delete Programs
+      const progSnapshot = await getDocs(collection(db, 'programs'));
+      batch = writeBatch(db);
+      count = 0;
+      for (const d of progSnapshot.docs) {
+        batch.delete(d.ref);
+        count++;
+        if (count >= batchSize) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+      await batch.commit();
+
+      alert('Berhasil menghapus semua data Program/Kegiatan.');
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menghapus data.');
+    }
+  };
+
   const toggleTag = async (subActivityId: string, tagId: string) => {
     const docId = `${subActivityId}_${tagId}`;
     const exists = budgetTags.some(bt => bt.subActivityId === subActivityId && bt.tagId === tagId);
@@ -495,6 +553,7 @@ export default function App() {
                   onUpdateSubActivity={updateSubActivity}
                   onDeleteSubActivity={deleteSubActivity}
                   onBulkAdd={bulkAddPrograms}
+                  onClearAll={clearAllProgramsData}
                 />
               )}
               {currentView === 'tag' && (
@@ -843,7 +902,7 @@ function MasterProgramView({
   onAddProgram, onUpdateProgram, onDeleteProgram,
   onAddActivity, onUpdateActivity, onDeleteActivity,
   onAddSubActivity, onUpdateSubActivity, onDeleteSubActivity,
-  onBulkAdd
+  onBulkAdd, onClearAll
 }: { 
   opds: OPD[], 
   programs: Program[], 
@@ -858,7 +917,8 @@ function MasterProgramView({
   onAddSubActivity: (s: Omit<SubActivity, 'id'>) => void,
   onUpdateSubActivity: (s: SubActivity) => void,
   onDeleteSubActivity: (id: string) => void,
-  onBulkAdd: (programs: any[], activities: any[], subActivities: any[]) => void
+  onBulkAdd: (programs: any[], activities: any[], subActivities: any[]) => void,
+  onClearAll: () => Promise<void>
 }) {
   const [selectedOpdId, setSelectedOpdId] = useState<string>('all');
   const [expandedProgramIds, setExpandedProgramIds] = useState<Set<string>>(new Set());
@@ -1067,6 +1127,12 @@ function MasterProgramView({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={onClearAll}
+            className="bg-red-50 text-red-600 px-4 py-2 rounded-[4px] text-[12px] font-semibold flex items-center gap-2 hover:bg-red-100 transition-colors shadow-sm border border-red-200"
+          >
+            <Trash2 size={16} /> Hapus Semua
+          </button>
           <label className="bg-slate-100 text-text-muted px-4 py-2 rounded-[4px] text-[12px] font-semibold flex items-center gap-2 hover:bg-slate-200 transition-colors shadow-sm cursor-pointer border border-border">
             <Upload size={16} /> Import Excel
             <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
@@ -1170,41 +1236,54 @@ function MasterProgramView({
                       </td>
                     </tr>
                     {expandedActivityIds.has(a.id) && (
-                      subActivities.filter(s => s.activityId === a.id).length > 0 ? (
-                        subActivities.filter(s => s.activityId === a.id).map(s => (
-                          <tr key={s.id} className="bg-slate-50/30 hover:bg-slate-100/50 transition-colors border-b border-border/50 last:border-0 group">
-                            <td className="px-6 py-2.5 font-mono text-[10px] text-primary/70 pl-24 flex items-center gap-2">
-                              {s.code}
-                            </td>
-                            <td className="px-6 py-2.5 text-text-main text-[13px] font-medium italic border-l-2 border-primary/20">{s.name}</td>
-                            <td className="px-6 py-2.5 text-right font-mono font-bold text-primary bg-primary/5">
-                              Rp {s.budget.toLocaleString()}
-                            </td>
-                            <td className="px-6 py-2.5">
-                              <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                  onClick={() => openEditSub(s)}
-                                  className="p-1 text-primary hover:bg-primary/10 rounded transition-colors"
-                                  title="Edit Sub-Kegiatan"
-                                >
-                                  <Edit2 size={12} />
-                                </button>
-                                <button 
-                                  onClick={() => onDeleteSubActivity(s.id)}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                  title="Hapus Sub-Kegiatan"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
+                      <React.Fragment>
+                        {subActivities.filter(s => s.activityId === a.id).length > 0 ? (
+                          subActivities.filter(s => s.activityId === a.id).map(s => (
+                            <tr key={s.id} className="bg-slate-50/20 group hover:bg-slate-100/40 transition-colors border-b border-slate-100 last:border-0">
+                              <td className="px-6 py-2 font-mono text-[9px] text-text-muted/60 pl-24 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary/30" />
+                                {s.code}
+                              </td>
+                              <td className="px-6 py-2 border-l-2 border-primary/10">
+                                <div className="flex flex-col pl-4">
+                                  <span className="text-[12px] font-medium text-text-main leading-tight italic">{s.name}</span>
+                                  <span className="text-[9px] text-text-muted uppercase tracking-tighter opacity-70">Sub-Kegiatan</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-2 text-right">
+                                <div className="inline-block px-3 py-1 rounded-full bg-primary/5 border border-primary/10">
+                                  <span className="font-mono font-bold text-primary text-[12px]">Rp {s.budget.toLocaleString()}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-2 text-right">
+                                <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-4">
+                                  <button 
+                                    onClick={() => openEditSub(s)}
+                                    className="p-1 px-2 text-primary hover:bg-primary/10 rounded-full transition-colors flex items-center gap-1 text-[10px] font-bold"
+                                    title="Edit Sub-Kegiatan"
+                                  >
+                                    <Edit2 size={10} /> EDIT
+                                  </button>
+                                  <button 
+                                    onClick={() => onDeleteSubActivity(s.id)}
+                                    className="p-1 px-2 text-red-600 hover:bg-red-50 rounded-full transition-colors flex items-center gap-1 text-[10px] font-bold"
+                                    title="Hapus Sub-Kegiatan"
+                                  >
+                                    <Trash2 size={10} /> HAPUS
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr className="bg-slate-50/10 transition-colors">
+                            <td colSpan={4} className="px-6 py-4 pl-24 text-[11px] text-text-muted italic flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full border border-dashed border-text-muted/40" />
+                              Belum ada rincian sub-kegiatan di bawah kegiatan ini.
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr className="bg-slate-50/20 italic text-[11px] text-text-muted">
-                          <td colSpan={4} className="px-6 py-2 pl-24">Belum ada sub-kegiatan di bawah kegiatan ini.</td>
-                        </tr>
-                      )
+                        )}
+                      </React.Fragment>
                     )}
                   </React.Fragment>
                 ))}
